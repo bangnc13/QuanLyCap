@@ -105,10 +105,10 @@ def load_server_data():
 df, file_name = load_server_data() 
 
 st.sidebar.markdown('<div class="sidebar-title">⚡ TQG-XÁC ĐỊNH VỊ TRÍ ĐỨT CÁP</div>', unsafe_allow_html=True)
-st.sidebar.markdown('<div class="sidebar-subtitle">Fiber Optic Break Location Finder - FPT Telecom System</div>', unsafe_allow_html=True)
+st.sidebar.markdown('<div class="sidebar-subtitle"></div>', unsafe_allow_html=True)
 
 if df is not None: 
-    st.sidebar.success(f"📁 Dữ liệu: {file_name}") 
+    st.sidebar.success(f" Make by BangNC13) 
     
     df.columns = [str(col).strip() for col in df.columns] 
     
