@@ -12,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS Tùy chỉnh giao diện Fullscreen & Sidebar
+# CSS Tùy chỉnh giao diện Fullscreen & Header Neon Title
 st.markdown("""
     <style>
         html, body, [data-testid="stAppViewContainer"], .main, .stApp {
@@ -31,22 +31,39 @@ st.markdown("""
             padding-right: 1rem !important;
         }
 
-        .sidebar-title {
-            font-size: 1.15rem !important;
-            font-weight: 700 !important;
-            color: #1F2937 !important;
-            margin-bottom: 2px !important;
-        }
         .sidebar-subtitle {
             font-size: 0.8rem !important;
             color: #6B7280 !important;
             margin-bottom: 12px !important;
         }
 
+        /* Tùy chỉnh Header để chứa tiêu đề Neon */
         header[data-testid="stHeader"] {
-            background: transparent !important;
-            height: 0px !important;
-            z-index: 999999 !important;
+            background: rgba(15, 23, 42, 0.75) !important;
+            backdrop-filter: blur(8px);
+            height: 3.5rem !important;
+            z-index: 99999 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: flex-start !important;
+            padding-left: 3.75rem !important; /* Dành khoảng trống cho nút Toggle Sidebar */
+            border-bottom: 1px solid rgba(0, 255, 204, 0.2);
+        }
+
+        /* Chèn tiêu đề Xanh Neon trực tiếp vào Header */
+        header[data-testid="stHeader"]::after {
+            content: "⚡ TQG-XÁC ĐỊNH VỊ TRÍ ĐỨT CÁP";
+            font-size: 1.1rem;
+            font-weight: 800;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            color: #00ffcc;
+            text-shadow: 
+                0 0 5px #00ffcc,
+                0 0 10px #00ffcc,
+                0 0 20px #00ffcc,
+                0 0 40px #00b386;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
         }
 
         .main .block-container, 
@@ -104,7 +121,6 @@ def load_server_data():
 
 df, file_name = load_server_data() 
 
-st.sidebar.markdown('<div class="sidebar-title">⚡ TQG-XÁC ĐỊNH VỊ TRÍ ĐỨT CÁP</div>', unsafe_allow_html=True)
 st.sidebar.markdown('<div class="sidebar-subtitle"></div>', unsafe_allow_html=True)
 
 if df is not None: 
@@ -331,7 +347,7 @@ if df is not None:
                 "radius": 4
             })
 
-    # Leaflet HTML (Đã di chuyển Zoom + Layer Map xuống cạnh dưới)
+    # Leaflet HTML
     leaflet_html = f"""
     <!DOCTYPE html>
     <html>
@@ -428,25 +444,25 @@ if df is not None:
                     attribution: 'Google Maps Satellite'
                 }});
 
-                // 3. Khởi tạo Map (Tắt zoomControl mặc định góc trên để chủ động đặt dưới)
+                // 3. Khởi tạo Map
                 var map = L.map('map', {{
-                    zoomControl: false, // 👈 Tắt nút Zoom mặc định ở góc trên
+                    zoomControl: false,
                     attributionControl: false,
                     layers: [googleStreets]
                 }}).setView({json.dumps(map_center)}, {zoom_lvl});
 
-                // 4. Chuyển nút Zoom (+ / -) xuống CẠNH DƯỚI BÊN TRÁI
+                // 4. Chuyển nút Zoom xuống CẠNH DƯỚI BÊN TRÁI
                 L.control.zoom({{
-                    position: 'bottomleft' // 👈 Chuyển xuống góc dưới bên trái
+                    position: 'bottomleft'
                 }}).addTo(map);
 
-                // 5. Chuyển Bảng chuyển lớp nền (Layer Map) xuống CẠNH DƯỚI BÊN PHẢI
+                // 5. Chuyển Bảng chuyển lớp nền xuống CẠNH DƯỚI BÊN PHẢI
                 var baseMaps = {{
                     "🗺️ Đường phố": googleStreets,
                     "🛰️ Vệ tinh": googleSat
                 }};
                 L.control.layers(baseMaps, null, {{ 
-                    position: 'bottomright' // 👈 Chuyển xuống góc dưới bên phải
+                    position: 'bottomright'
                 }}).addTo(map);
 
                 // 6. Vẽ tuyến cáp
@@ -516,7 +532,7 @@ if df is not None:
                 map.on('locationerror', onLocationError);
                 map.locate({{ watch: true, setView: false, enableHighAccuracy: true }});
 
-                // 10. Tính năng Chỉ đường Routing từ GPS đến Điểm Đứt cáp
+                // 10. Tính năng Chỉ đường Routing
                 var routingControl = null;
 
                 function drawRouteToDestination() {{
@@ -555,7 +571,7 @@ if df is not None:
                     }}).addTo(map);
                 }}
 
-                // 11. Tạo bảng điều khiển Nút Bấm GPS & Chỉ Đường (Góc trên bên trái)
+                // 11. Tạo bảng điều khiển Nút Bấm GPS & Chỉ Đường
                 var CustomControls = L.Control.extend({{
                     options: {{ position: 'topleft' }},
                     onAdd: function (map) {{
