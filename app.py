@@ -2,8 +2,8 @@ import os
 import streamlit as st 
 import pandas as pd 
 import networkx as nx 
-import folium 
-from streamlit_folium import st_folium 
+import streamlit.components.v1 as components
+import json
 
 # 1. Cấu hình trang Streamlit 
 st.set_page_config(
@@ -29,7 +29,7 @@ st.markdown("""
             z-index: 999999 !important;
         }
         section[data-testid="stSidebar"] > div:first-child {
-            padding-top: 1.5rem !important; /* Khoảng đệm hài hòa phía trên tiêu đề */
+            padding-top: 1.5rem !important;
             padding-left: 1rem !important;
             padding-right: 1rem !important;
         }
@@ -81,10 +81,7 @@ st.markdown("""
             max-height: 100vh !important;
         }
 
-        /* 7. Ép Frame bản đồ sát cạnh Trên, Cạnh Dưới và Cạnh Phải */
-        [data-testid="element-container"], 
-        .stCustomComponentV1, 
-        div[data-testid="stCustomComponentV1"],
+        /* 7. Ép iframe Leaflet tràn tuyệt đối toàn màn hình */
         iframe {
             width: 100vw !important;
             height: 100vh !important;
@@ -279,7 +276,7 @@ if df is not None:
             st.sidebar.markdown(f"📍 **GPS:** `{gps[0]:.6f}, {gps[1]:.6f}`") 
             st.sidebar.markdown(f"👉 [**Mở trên Google Maps**]({gmap_url})") 
 
-    # 3. Hiển thị Bản đồ 
+    # 3. Chuẩn bị Dữ liệu Render Bản đồ Leaflet JS
     map_center = [21.0285, 105.8542] 
     zoom_lvl = 12 
 
@@ -291,66 +288,145 @@ if df is not None:
         map_center = [first_coord[0], first_coord[1]] 
         zoom_lvl = 15 
 
-    m = folium.Map(location=map_center, zoom_start=zoom_lvl, tiles="OpenStreetMap") 
+    polylines = []
+    markers = []
+    break_marker = None
 
-    # Nếu ĐÃ TÍNH ĐƯỢC VỊ TRÍ ĐỨT -> Chỉ vẽ tuyến bị đứt 
+    # Nếu ĐÃ TÍNH ĐƯỢC VỊ TRÍ ĐỨT -> Chỉ vẽ tuyến bị đứt
     if st.session_state.break_result: 
         u = st.session_state.break_result['from'] 
         v = st.session_state.break_result['to'] 
 
         if u in node_coords and v in node_coords: 
-            folium.PolyLine( 
-                locations=[node_coords[u], node_coords[v]], 
-                color="red", 
-                weight=6, 
-                opacity=0.9, 
-                tooltip=f"Sự cố đoạn: {st.session_state.break_result['cable']}" 
-            ).add_to(m) 
+            polylines.append({
+                "coords": [node_coords[u], node_coords[v]],
+                "color": "#EF4444",
+                "weight": 6,
+                "opacity": 0.9,
+                "tooltip": f"Sự cố đoạn: {st.session_state.break_result['cable']}"
+            })
 
             for node in [u, v]: 
-                folium.CircleMarker( 
-                    location=node_coords[node], 
-                    radius=7, 
-                    popup=f"Điểm KN: {node}", 
-                    tooltip=f"Điểm KN: {node}", 
-                    color="blue", 
-                    fill=True, 
-                    fill_color="white" 
-                ).add_to(m) 
+                markers.append({
+                    "coords": node_coords[node],
+                    "popup": f"Điểm KN: {node}",
+                    "tooltip": f"Điểm KN: {node}",
+                    "color": "#3B82F6",
+                    "radius": 8
+                })
 
         if st.session_state.break_gps: 
             res = st.session_state.break_result
-            folium.Marker( 
-                location=st.session_state.break_gps, 
-                popup=f"🚨 VỊ TRÍ ĐỨT CÁP: {res['cable']}<br>• Cách {res['from']}: {res['d1']:.1f}m<br>• Cách {res['to']}: {res['d2']:.1f}m", 
-                tooltip="Vị trí đứt cáp", 
-                icon=folium.Icon(color="red", icon="warning", prefix="fa") 
-            ).add_to(m) 
+            break_marker = {
+                "coords": st.session_state.break_gps,
+                "popup": f"<b>🚨 VỊ TRÍ ĐỨT CÁP: {res['cable']}</b><br>• Cách {res['from']}: {res['d1']:.1f}m<br>• Cách {res['to']}: {res['d2']:.1f}m",
+                "tooltip": "Vị trí đứt cáp"
+            }
 
-    # Nếu CHƯA ĐO -> Hiển thị toàn bộ mạng cáp để quan sát tổng thể 
+    # Nếu CHƯA ĐO -> Hiển thị toàn bộ mạng cáp để quan sát tổng thể
     else: 
         for u, v, data in G.edges(data=True): 
             if u in node_coords and v in node_coords: 
-                folium.PolyLine( 
-                    locations=[node_coords[u], node_coords[v]], 
-                    color="#2b5c8f", 
-                    weight=3, 
-                    opacity=0.6, 
-                    tooltip=f"Cáp: {data.get('cable', '')}" 
-                ).add_to(m) 
+                polylines.append({
+                    "coords": [node_coords[u], node_coords[v]],
+                    "color": "#2B5C8F",
+                    "weight": 3,
+                    "opacity": 0.6,
+                    "tooltip": f"Cáp: {data.get('cable', '')}"
+                })
 
         for node_id, coord in node_coords.items(): 
-            folium.CircleMarker( 
-                location=coord, 
-                radius=4, 
-                popup=f"Điểm KN: {node_id}", 
-                tooltip=node_id, 
-                color="#2b5c8f", 
-                fill=True, 
-                fill_color="white" 
-            ).add_to(m) 
+            markers.append({
+                "coords": coord,
+                "popup": f"Điểm KN: {node_id}",
+                "tooltip": str(node_id),
+                "color": "#2B5C8F",
+                "radius": 4
+            })
 
-    st_folium(m, use_container_width=True, height=1000, key=f"folium_map_{st.session_state.break_gps}") 
+    # Template HTML/JS render Leaflet
+    leaflet_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <style>
+            html, body, #map {{
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }}
+            .custom-break-icon {{
+                background-color: #EF4444;
+                border: 2px solid #FFFFFF;
+                border-radius: 50%;
+                width: 24px !important;
+                height: 24px !important;
+                margin-left: -12px !important;
+                margin-top: -12px !important;
+                box-shadow: 0 0 10px rgba(239, 68, 68, 0.8);
+                animation: pulse 1.5s infinite;
+            }}
+            @keyframes pulse {{
+                0% {{ transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }}
+                70% {{ transform: scale(1.2); box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); }}
+                100% {{ transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }}
+            }}
+        </style>
+    </head>
+    <body>
+        <div id="map"></div>
+        <script>
+            var map = L.map('map', {{
+                zoomControl: true,
+                attributionControl: false
+            }}).setView({json.dumps(map_center)}, {zoom_lvl});
+
+            L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
+                maxZoom: 19
+            }}).addTo(map);
+
+            var polylinesData = {json.dumps(polylines)};
+            polylinesData.forEach(function(item) {{
+                var line = L.polyline(item.coords, {{
+                    color: item.color,
+                    weight: item.weight,
+                    opacity: item.opacity
+                }}).addTo(map);
+                if (item.tooltip) line.bindTooltip(item.tooltip);
+            }});
+
+            var markersData = {json.dumps(markers)};
+            markersData.forEach(function(item) {{
+                var circle = L.circleMarker(item.coords, {{
+                    radius: item.radius,
+                    color: item.color,
+                    fillColor: '#FFFFFF',
+                    fillOpacity: 0.9,
+                    weight: 2
+                }}).addTo(map);
+                if (item.popup) circle.bindPopup(item.popup);
+                if (item.tooltip) circle.bindTooltip(item.tooltip);
+            }});
+
+            var breakMarkerData = {json.dumps(break_marker)};
+            if (breakMarkerData) {{
+                var breakIcon = L.divIcon({{ className: 'custom-break-icon' }});
+                var bMarker = L.marker(breakMarkerData.coords, {{ icon: breakIcon }}).addTo(map);
+                if (breakMarkerData.popup) bMarker.bindPopup(breakMarkerData.popup).openPopup();
+                if (breakMarkerData.tooltip) bMarker.bindTooltip(breakMarkerData.tooltip);
+            }}
+        </script>
+    </body>
+    </html>
+    """
+
+    # Hiển thị Leaflet Map qua Streamlit Components
+    components.html(leaflet_html, height=1000, scrolling=False)
 
 else: 
     st.error("❌ Không tìm thấy file Excel trên Server. Vui lòng kiểm tra lại tên file `Danh-Sách-Đoạn-Cáp.xlsx` trong thư mục chạy mã.")
