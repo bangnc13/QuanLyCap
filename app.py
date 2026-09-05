@@ -212,16 +212,12 @@ if df is not None:
         map_center = [first_coord[0], first_coord[1]]
         zoom_lvl = 15
 
-    m = folium.Map(location=map_center, zoom_start=zoom_lvl, tiles=None)
-
-# 2. Thêm các lớp nền khác nhau
-folium.TileLayer('CartoDB positron', name='Nền Sáng (Mặc định)').add_to(m)
-folium.TileLayer('OpenStreetMap', name='OpenStreetMap').add_to(m)
-folium.TileLayer(
-    tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    attr='Esri',
-    name='Vệ Tinh (Esri)'
-).add_to(m)
+    m = folium.Map(
+    location=map_center,
+    zoom_start=zoom_lvl,
+    tiles="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    attr="&copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors"
+)
 
 # 3. Thêm nút chuyển đổi Layer trên bản đồ
 folium.LayerControl().add_to(m)
