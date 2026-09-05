@@ -12,41 +12,17 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 ) 
 
-# CSS Tối ưu giao diện Dark Mode & Ép bản đồ phủ 100% màn hình
+# CSS tùy chỉnh để làm tràn viền bản đồ, loại bỏ khoảng trắng thừa ở trên cùng
 st.markdown("""
     <style>
-        /* Hide Streamlit Header & Footer */
-        header {visibility: hidden;}
-        footer {visibility: hidden;}
-        #MainMenu {visibility: hidden;}
-        
-        /* Reset padding của ứng dụng về 0 */
-        .main .block-container {
-            padding: 0rem !important;
-            max-width: 100% !important;
-            height: 100vh !important;
-            overflow: hidden;
+        .block-container {
+            padding-top: 1rem;
+            padding-bottom: 0rem;
+            padding-left: 1rem;
+            padding-right: 1rem;
         }
-        
-        /* Tùy chỉnh Sidebar Dark Theme giống ảnh 2 */
-        [data-testid="stSidebar"] {
-            background-color: #1a1d24 !important;
-        }
-        [data-testid="stSidebar"] * {
-            color: #e0e0e0 !important;
-        }
-        
-        /* Ép Iframe chứa bản đồ chiếm 100% chiều cao và chiều rộng */
-        div[data-testid="stIframe"] {
+        iframe {
             width: 100% !important;
-            height: 100vh !important;
-            position: absolute;
-            top: 0;
-            left: 0;
-        }
-        div[data-testid="stIframe"] > iframe {
-            width: 100% !important;
-            height: 100vh !important;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -86,17 +62,15 @@ def load_server_data():
 # 2. Tải Dữ Liệu Từ Server 
 df, file_name = load_server_data() 
 
-# ĐẶT TIÊU ĐỀ BÊN TRÁI SIDEBAR
-st.sidebar.markdown("### ⚡ Xác định Vị trí Đứt Cáp")
-st.sidebar.caption("Fiber Optic Break Location Finder")
+# ĐẶT TIÊU ĐỀ Ở TÊN CÙNG BÊN TRÁI (Trên đầu Sidebar)
+st.sidebar.markdown("### ⚡ TQG-XÁC ĐỊNH VỊ TRÍ ĐỨT CÁP")
+st.sidebar.caption("Fiber Optic Break Location Finder - FPT Telecom System")
 st.sidebar.markdown("---")
  
 if df is not None: 
-    df.columns = [str(col).strip() for col in df.columns] 
-     
-    # Thông báo trạng thái dữ liệu (Giống thẻ màu xanh ở Ảnh 2)
-    st.sidebar.info(f"Đã tải {len(df)} đoạn cáp từ dữ liệu hệ thống")
     st.sidebar.success("🐒 Make by BangNC13") 
+     
+    df.columns = [str(col).strip() for col in df.columns] 
      
     # Tự động tìm các cột Tọa độ 
     lat_col1 = next((c for c in df.columns if 'lat' in c.lower() and '1' in c.lower()), None) 
@@ -109,16 +83,11 @@ if df is not None:
         lon_col1 = next((c for c in df.columns if 'lng' in c.lower() or 'lon' in c.lower() or 'kinh độ' in c.lower()), None) 
  
     # Lọc tuyến cáp theo POP 
-    st.sidebar.markdown("**LỌC DỮ LIỆU**")
     if 'Tên đoạn cáp' in df.columns: 
         df['POP'] = df['Tên đoạn cáp'].apply(lambda x: str(x).split('.')[0] if '.' in str(x) else str(x)) 
-        pop_list = ["-- Tất cả POP --"] + sorted(list(df['POP'].unique())) 
-        selected_pop = st.sidebar.selectbox("POP", pop_list, key="selected_pop") 
-        
-        if selected_pop != "-- Tất cả POP --":
-            pop_df = df[df['POP'] == selected_pop].copy() 
-        else:
-            pop_df = df.copy()
+        pop_list = sorted(df['POP'].unique()) 
+        selected_pop = st.sidebar.selectbox("LỌC DỮ LIỆU POP", pop_list, key="selected_pop") 
+        pop_df = df[df['POP'] == selected_pop].copy() 
     else: 
         pop_df = df.copy() 
  
@@ -146,7 +115,7 @@ if df is not None:
             G.add_edge(k1, k2, cable=cable, length=length) 
  
     st.sidebar.markdown("---") 
-    st.sidebar.markdown("**THÔNG TIN ĐO (OTDR)**") 
+    st.sidebar.subheader("📍 THÔNG TIN ĐO (OTDR)") 
      
     all_nodes = sorted(list(G.nodes())) 
     if all_nodes: 
@@ -228,7 +197,7 @@ if df is not None:
             st.sidebar.markdown(f"📍 **GPS:** `{gps[0]:.6f}, {gps[1]:.6f}`") 
             st.sidebar.markdown(f"👉 [**Mở trên Google Maps**]({gmap_url})") 
 
-    # 3. Hiển thị Bản đồ Leaflet Full Màn Hình
+    # 3. Hiển thị Bản đồ Leaflet Full Màn Hình (Chỉ dùng Google Maps)
     map_center = [21.0285, 105.8542] 
     zoom_lvl = 12 
  
@@ -251,7 +220,7 @@ if df is not None:
         control=True
     ).add_to(m)
 
-    # Lớp 2: Google Maps Vệ tinh (Hybrid - giống mặc định ở Ảnh 2)
+    # Lớp 2: Google Maps Vệ tinh (Hybrid)
     folium.TileLayer(
         tiles="https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
         attr="Google Maps Satellite",
@@ -301,31 +270,25 @@ if df is not None:
             if u in node_coords and v in node_coords: 
                 folium.PolyLine( 
                     locations=[node_coords[u], node_coords[v]], 
-                    color="#00e676", 
+                    color="#2b5c8f", 
                     weight=3, 
-                    opacity=0.7, 
+                    opacity=0.6, 
                     tooltip=f"Cáp: {data.get('cable', '')}" 
                 ).add_to(m) 
 
         for node_id, coord in node_coords.items(): 
             folium.CircleMarker( 
                 location=coord, 
-                radius=3, 
+                radius=4, 
                 popup=f"Điểm KN: {node_id}", 
                 tooltip=node_id, 
-                color="#00e676", 
+                color="#2b5c8f", 
                 fill=True, 
                 fill_color="white" 
             ).add_to(m) 
 
-    # Render bản đồ tràn toàn bộ màn hình
-    st_folium(
-        m, 
-        use_container_width=True, 
-        height=1200, 
-        returned_objects=[],
-        key="folium_map"
-    ) 
+    # Đặt height cố định tầm 780px để mở rộng màn hình map tối đa
+    st_folium(m, use_container_width=True, height=780, key="folium_map") 
 
 else: 
     st.error("❌ Không tìm thấy file Excel trên Server. Vui lòng kiểm tra lại tên file `Danh-Sách-Đoạn-Cáp.xlsx` trong thư mục chạy mã.")
