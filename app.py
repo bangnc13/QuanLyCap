@@ -1,18 +1,18 @@
 import os 
-import streamlit as st 
+import json
 import pandas as pd 
 import networkx as nx 
+import streamlit as st 
 import streamlit.components.v1 as components
-import json
 
-# 1. Cấu hình trang Streamlit 
+# 1. Cấu hình trang Streamlit
 st.set_page_config(
     page_title="Xác Định Vị Trí Đứt Cáp - BangNC13", 
     layout="wide", 
     initial_sidebar_state="expanded"
 ) 
 
-# CSS Tùy chỉnh giao diện full screen
+# CSS Tùy chỉnh giao diện Fullscreen & Sidebar
 st.markdown("""
     <style>
         html, body, [data-testid="stAppViewContainer"], .main, .stApp {
@@ -108,7 +108,7 @@ st.sidebar.markdown('<div class="sidebar-title">⚡ TQG-XÁC ĐỊNH VỊ TRÍ �
 st.sidebar.markdown('<div class="sidebar-subtitle">Fiber Optic Break Location Finder - FPT Telecom System</div>', unsafe_allow_html=True)
 
 if df is not None: 
-    st.sidebar.success(f"🐒 Make by BangNC13") 
+    st.sidebar.success("🐒 Make by BangNC13") 
     
     df.columns = [str(col).strip() for col in df.columns] 
     
@@ -239,7 +239,7 @@ if df is not None:
             st.sidebar.markdown(f"📍 **GPS:** `{gps[0]:.6f}, {gps[1]:.6f}`") 
             st.sidebar.link_button("📍 Mở trên Google Maps", gmap_url, type="primary", use_container_width=True)
 
-    # 3. Chuẩn bị Dữ liệu Render Bản đồ Leaflet JS
+    # 2. Chuẩn bị Dữ liệu Render Bản đồ Leaflet JS
     map_center = [21.0285, 105.8542] 
     zoom_lvl = 12 
 
@@ -331,6 +331,7 @@ if df is not None:
                 "radius": 4
             })
 
+    # Leaflet HTML - Tải trực tiếp Google Maps Tile (Chống bị chặn Firewall/IP)
     leaflet_html = f"""
     <!DOCTYPE html>
     <html>
@@ -350,7 +351,7 @@ if df is not None:
             #map {{
                 width: 100%;
                 height: 100vh;
-                background: #f8f9fa;
+                background: #e5e3df;
             }}
             .custom-break-icon {{
                 background-color: #EF4444;
@@ -379,30 +380,33 @@ if df is not None:
         <div id="map"></div>
         <script>
             document.addEventListener("DOMContentLoaded", function() {{
-                var streetMap = L.tileLayer('https://tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
-                    maxZoom: 19,
-                    attribution: '&copy; OpenStreetMap contributors',
-                    crossOrigin: true
+                // 1. Khởi tạo Tile Google Đường phố
+                var googleStreets = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={{x}}&y={{y}}&z={{z}}', {{
+                    maxZoom: 20,
+                    attribution: 'Google Maps'
                 }});
 
-                var satelliteMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{{z}}/{{y}}/{{x}}', {{
-                    maxZoom: 19,
-                    attribution: 'Tiles &copy; Esri',
-                    crossOrigin: true
+                // 2. Khởi tạo Tile Google Vệ tinh
+                var googleSat = L.tileLayer('https://mt1.google.com/vt/lyrs=s,h&x={{x}}&y={{y}}&z={{z}}', {{
+                    maxZoom: 20,
+                    attribution: 'Google Maps Satellite'
                 }});
 
+                // 3. Khởi tạo Map
                 var map = L.map('map', {{
                     zoomControl: true,
                     attributionControl: false,
-                    layers: [streetMap]
+                    layers: [googleStreets]
                 }}).setView({json.dumps(map_center)}, {zoom_lvl});
 
+                // 4. Bảng chuyển đổi lớp nền góc trên bên phải
                 var baseMaps = {{
-                    "🗺️ Đường phố": streetMap,
-                    "🛰️ Vệ tinh": satelliteMap
+                    "🗺️ Google Đường phố": googleStreets,
+                    "🛰️ Google Vệ tinh": googleSat
                 }};
                 L.control.layers(baseMaps, null, {{ position: 'topright' }}).addTo(map);
 
+                // 5. Vẽ tuyến cáp
                 var polylinesData = {json.dumps(polylines)};
                 polylinesData.forEach(function(item) {{
                     var line = L.polyline(item.coords, {{
@@ -413,6 +417,7 @@ if df is not None:
                     if (item.tooltip) line.bindTooltip(item.tooltip);
                 }});
 
+                // 6. Vẽ điểm kết nối (KN)
                 var markersData = {json.dumps(markers)};
                 markersData.forEach(function(item) {{
                     var circle = L.circleMarker(item.coords, {{
@@ -426,6 +431,7 @@ if df is not None:
                     if (item.tooltip) circle.bindTooltip(item.tooltip);
                 }});
 
+                // 7. Vẽ điểm đứt cáp
                 var breakMarkerData = {json.dumps(break_marker)};
                 if (breakMarkerData) {{
                     var breakIcon = L.divIcon({{ className: 'custom-break-icon' }});
@@ -434,6 +440,7 @@ if df is not None:
                     if (breakMarkerData.tooltip) bMarker.bindTooltip(breakMarkerData.tooltip);
                 }}
 
+                // 8. Cập nhật lại size khung hiển thị
                 setTimeout(function() {{
                     map.invalidateSize();
                 }}, 200);
@@ -446,4 +453,4 @@ if df is not None:
     components.html(leaflet_html, height=1000, scrolling=False)
 
 else: 
-    st.error("❌ Không tìm thấy file Excel trên Server. Vui lòng kiểm tra lại tên file `Danh-Sách-Đoạn-Cáp.xlsx` trong thư mục chạy mã.")
+    st.error("❌ Không tìm thấy file Excel trên Server. Vui lòng kiểm tra lại file data trong thư mục.")
