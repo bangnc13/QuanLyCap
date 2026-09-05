@@ -12,34 +12,43 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 2. CSS Tùy chỉnh tràn toàn bộ màn hình (Full Screen Viewport)
+# 2. CSS Tùy chỉnh TRÀN HẾT TẤT CẢ CÁC CẠNH MÀN HÌNH
 st.markdown("""
     <style>
-        /* Loại bỏ padding mặc định của Streamlit */
+        /* 1. Xóa sạch margin & padding của toàn bộ trang */
+        html, body, [data-testid="stAppViewContainer"], .main {
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: hidden !important; /* Triệt tiêu thanh cuộn trang web */
+        }
+
+        /* 2. Ép container chứa nội dung chính ra sát mép 4 cạnh */
         .main .block-container {
-            padding-top: 0rem !important;
-            padding-bottom: 0rem !important;
-            padding-left: 0rem !important;
-            padding-right: 0rem !important;
-            max-width: 100% !important;
+            padding: 0rem !important;
+            margin: 0rem !important;
+            max-width: 100vw !important;
+            width: 100vw !important;
+            height: 100vh !important;
         }
-        
-        /* Loại bỏ header ẩn mặc định để tối ưu không gian */
+
+        /* 3. Lược bỏ khoảng trống header/topbar mặc định */
         header[data-testid="stHeader"] {
-            background-color: transparent !important;
-            z-index: 100 !important;
+            display: none !important;
         }
-        
-        /* Ép iframe bản đồ tràn full khung hình */
+
+        /* 4. Ép thẻ iframe chứa bản đồ chiếm 100% chiều cao và chiều rộng góc nhìn */
         iframe {
-            width: 100% !important;
+            width: 100vw !important;
             height: 100vh !important;
             border: none !important;
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
         }
-        
-        /* Tùy chỉnh thanh Sidebar gọn gàng */
+
+        /* 5. Giữ cho Sidebar nằm đè lên bản đồ đẹp mắt */
         section[data-testid="stSidebar"] {
-            z-index: 999;
+            z-index: 999999 !important;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -248,7 +257,7 @@ if df is not None:
 
     folium.LayerControl(position="topright").add_to(m)
 
-    # Nếu ĐÃ TÍNH ĐƯỢC VỊ TRÍ ĐỨT
+    # Vẽ các đường cáp & Node
     if st.session_state.break_result:
         u = st.session_state.break_result['from']
         v = st.session_state.break_result['to']
@@ -280,8 +289,6 @@ if df is not None:
                 tooltip="Vị trí đứt cáp",
                 icon=folium.Icon(color="red", icon="warning", prefix="fa")
             ).add_to(m)
-
-    # Nếu CHƯA ĐO
     else:
         for u, v, data in G.edges(data=True):
             if u in node_coords and v in node_coords:
@@ -304,8 +311,8 @@ if df is not None:
                 fill_color="white"
             ).add_to(m)
 
-    # Render bản đồ tràn viền màn hình
-    st_folium(m, use_container_width=True, height=1000, key="folium_map")
+    # Render bản đồ tràn tuyệt đối không gian màn hình
+    st_folium(m, use_container_width=True, height=2000, key="folium_map")
 
 else:
-    st.error("❌ Không tìm thấy file Excel trên Server. Vui lòng kiểm tra lại tên file `Danh-Sách-Đoạn-Cáp.xlsx` trong thư mục chạy mã.")
+    st.error("❌ Không tìm thấy file Excel trên Server.")
