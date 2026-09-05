@@ -16,7 +16,7 @@ st.set_page_config(
 # 2. CSS Tùy chỉnh TRÀN MÀN HÌNH TỐI ĐA (KHÔNG KHOẢNG TRẮNG CẠNH DƯỚI)
 st.markdown(""" 
     <style> 
-        /* Xóa cuộn và khoảng thừa cấp Root */ 
+        /* 1. Xóa cuộn và khoảng thừa cấp Root */ 
         html, body, [data-testid="stAppViewContainer"], .main, .stApp { 
             margin: 0 !important; 
             padding: 0 !important; 
@@ -25,14 +25,14 @@ st.markdown("""
             overflow: hidden !important; 
         } 
  
-        /* Triệt tiêu nền và chiều cao Header */ 
+        /* 2. Triệt tiêu nền và chiều cao Header */ 
         header[data-testid="stHeader"] { 
             background: transparent !important; 
             height: 0px !important; 
             z-index: 999999 !important; 
         } 
  
-        /* Đưa nút Sidebar lên trên cùng */ 
+        /* 3. Đưa nút Sidebar lên trên cùng */ 
         [data-testid="stSidebarCollapseButton"],  
         [data-testid="collapsedControl"] { 
             z-index: 1000000 !important; 
@@ -45,7 +45,7 @@ st.markdown("""
             padding: 4px !important; 
         } 
  
-        /* Ép container chính không còn khoảng trống thừa */ 
+        /* 4. Ép container chính không còn khoảng trống thừa */ 
         .main .block-container,  
         [data-testid="stMainBlockContainer"], 
         [data-testid="stVerticalBlock"],
@@ -58,7 +58,7 @@ st.markdown("""
             max-height: 100vh !important;
         } 
  
-        /* Ép TẤT CẢ wrapper cha của iframe bản đồ kéo dãn sát cạnh dưới */ 
+        /* 5. Ép TẤT CẢ wrapper cha của iframe bản đồ kéo dãn sát cạnh dưới */ 
         [data-testid="element-container"], 
         .stCustomComponentV1, 
         div[data-testid="stCustomComponentV1"],
@@ -239,25 +239,17 @@ if df is not None:
             st.session_state.break_gps = b_gps 
             st.rerun() 
  
-    # Hiển thị thông tin kết quả chi tiết khoảng cách đến 2 tập điểm
     if st.session_state.break_result: 
         res = st.session_state.break_result 
         st.sidebar.error("📍 VỊ TRÍ ĐỨT CÁP DỰ KIẾN") 
-        st.sidebar.markdown(f"**Đoạn cáp bị đứt:** `{res['cable']}`") 
-        st.sidebar.markdown(f"• Tổng chiều dài tuyến: `{res['seg_len']:.1f}m`")
-        
-        # Thẻ hiển thị khoảng cách 2 đầu tập điểm/điểm kết nối
-        st.sidebar.markdown("---")
-        st.sidebar.markdown("**📐 Khoảng cách đến 2 điểm kết nối (Tập điểm):**")
-        st.sidebar.info(
-            f"🔹 **Từ {res['from']}:** `{res['d1']:.1f} m`\n\n"
-            f"🔸 **Từ {res['to']}:** `{res['d2']:.1f} m`"
-        )
+        st.sidebar.markdown(f"**Đoạn cáp:** `{res['cable']}`") 
+        st.sidebar.markdown(f"• Cách **{res['from']}**: `{res['d1']:.1f}m` / {res['seg_len']}m") 
+        st.sidebar.markdown(f"• Cách **{res['to']}**: `{res['d2']:.1f}m`") 
           
         if st.session_state.break_gps: 
             gps = st.session_state.break_gps 
             gmap_url = f"https://www.google.com/maps?q={gps[0]},{gps[1]}" 
-            st.sidebar.markdown(f"📍 **Tọa độ GPS:** `{gps[0]:.6f}, {gps[1]:.6f}`") 
+            st.sidebar.markdown(f"📍 **GPS:** `{gps[0]:.6f}, {gps[1]:.6f}`") 
             st.sidebar.markdown(f"👉 [**Mở trên Google Maps**]({gmap_url})") 
  
     # Tính toán vị trí tâm bản đồ
@@ -319,10 +311,9 @@ if df is not None:
                 ).add_to(m) 
  
         if st.session_state.break_gps: 
-            res = st.session_state.break_result
             folium.Marker( 
                 location=st.session_state.break_gps, 
-                popup=f"🚨 VỊ TRÍ ĐỨT CÁP: {res['cable']}<br>• Cách {res['from']}: {res['d1']:.1f}m<br>• Cách {res['to']}: {res['d2']:.1f}m", 
+                popup=f"🚨 VỊ TRÍ ĐỨT CÁP: {st.session_state.break_result['cable']}", 
                 tooltip="Vị trí đứt cáp", 
                 icon=folium.Icon(color="red", icon="warning", prefix="fa") 
             ).add_to(m) 
@@ -335,7 +326,7 @@ if df is not None:
                     weight=3, 
                     opacity=0.6, 
                     tooltip=f"Cáp: {data.get('cable', '')}" 
-                ).add_to(m)  
+                ).add_to(m) 
  
         for node_id, coord in node_coords.items(): 
             folium.CircleMarker( 
