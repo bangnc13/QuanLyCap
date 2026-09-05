@@ -5,14 +5,14 @@ import networkx as nx
 import streamlit as st
 import streamlit.components.v1 as components
 
-# 1. Cấu hình trang Streamlit (BẮT BỘC phải đặt đầu tiên sau các lệnh import)
+# 1. Cấu hình trang Streamlit
 st.set_page_config(
     page_title="Xác Định Vị Trí Đứt Cáp - BangNC13", 
     layout="wide", 
     initial_sidebar_state="expanded"
 )
 
-# 2. CSS Tùy chỉnh giao diện Fullscreen & Đưa badge tiêu đề vào Header
+# CSS Tùy chỉnh giao diện Fullscreen & Sidebar
 st.markdown("""
     <style>
         html, body, [data-testid="stAppViewContainer"], .main, .stApp {
@@ -22,41 +22,31 @@ st.markdown("""
             overflow: hidden !important;
         }
 
-        /* Định dạng Header của Streamlit */
-        header[data-testid="stHeader"] {
-            background-color: #ffffff !important;
-            height: 2.8rem !important;
-            z-index: 9999999 !important;
-            border-bottom: 1px solid #E5E7EB;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-        }
-
-        /* Chèn Badge Tiêu đề trực tiếp vào bên trái Header bằng CSS pseudo-element */
-        header[data-testid="stHeader"]::after {
-            content: "⚡ TQG-XÁC ĐỊNH VỊ TRÍ ĐỨT CÁP  |  FPT Telecom";
-            position: absolute;
-            top: 50%;
-            left: 50px; /* Nằm ngay sát sau nút toggle Sidebar */
-            transform: translateY(-50%);
-            background-color: #F3F4F6;
-            color: #1E3A8A;
-            font-size: 0.82rem;
-            font-weight: 800;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            padding: 3px 10px;
-            border-radius: 6px;
-            border: 1px solid #E5E7EB;
-            white-space: nowrap;
-            pointer-events: none;
-        }
-
         section[data-testid="stSidebar"] {
             z-index: 999999 !important;
         }
         section[data-testid="stSidebar"] > div:first-child {
-            padding-top: 1rem !important;
+            padding-top: 1.5rem !important;
             padding-left: 1rem !important;
             padding-right: 1rem !important;
+        }
+
+        .sidebar-title {
+            font-size: 1.15rem !important;
+            font-weight: 700 !important;
+            color: #1F2937 !important;
+            margin-bottom: 2px !important;
+        }
+        .sidebar-subtitle {
+            font-size: 0.8rem !important;
+            color: #6B7280 !important;
+            margin-bottom: 12px !important;
+        }
+
+        header[data-testid="stHeader"] {
+            background: transparent !important;
+            height: 0px !important;
+            z-index: 999999 !important;
         }
 
         .main .block-container, 
@@ -114,8 +104,11 @@ def load_server_data():
 
 df, file_name = load_server_data() 
 
+st.sidebar.markdown('<div class="sidebar-title">⚡ TQG-XÁC ĐỊNH VỊ TRÍ ĐỨT CÁP</div>', unsafe_allow_html=True)
+st.sidebar.markdown('<div class="sidebar-subtitle"></div>', unsafe_allow_html=True)
+
 if df is not None: 
-    st.sidebar.success(f"📁 Dữ liệu: {file_name}") 
+    st.sidebar.success(f"Make by BangNC13") 
     
     df.columns = [str(col).strip() for col in df.columns] 
     
@@ -227,7 +220,7 @@ if df is not None:
             st.session_state.break_gps = b_gps 
             st.rerun() 
 
-    # Hiển thị kết quả trên Sidebar
+    # Hiển thị trên Sidebar khi có kết quả
     if st.session_state.break_result: 
         res = st.session_state.break_result 
         st.sidebar.error("📍 VỊ TRÍ ĐỨT CÁP DỰ KIẾN") 
@@ -246,7 +239,7 @@ if df is not None:
             st.sidebar.markdown(f"📍 **GPS:** `{gps[0]:.6f}, {gps[1]:.6f}`") 
             st.sidebar.link_button("🚗 Dẫn đường qua Google Maps App", gmap_url, type="primary", use_container_width=True)
 
-    # 3. Chuẩn bị Dữ liệu Render Bản đồ Leaflet JS
+    # 2. Chuẩn bị Dữ liệu Render Bản đồ Leaflet JS
     map_center = [21.0285, 105.8542] 
     zoom_lvl = 12 
 
@@ -338,7 +331,7 @@ if df is not None:
                 "radius": 4
             })
 
-    # Leaflet HTML Render Map
+    # Leaflet HTML (Đã di chuyển Zoom + Layer Map xuống cạnh dưới)
     leaflet_html = f"""
     <!DOCTYPE html>
     <html>
@@ -409,9 +402,11 @@ if df is not None:
             .leaflet-control-btn:hover {{
                 background-color: #f4f4f4;
             }}
+            /* Ẩn hoàn toàn bảng hướng dẫn từng bước của Leaflet Routing */
             .leaflet-routing-container {{
                 display: none !important;
             }}
+            /* Điều chỉnh lề dưới cho gọn trên di động */
             .leaflet-bottom {{
                 margin-bottom: 10px;
             }}
@@ -421,34 +416,40 @@ if df is not None:
         <div id="map"></div>
         <script>
             document.addEventListener("DOMContentLoaded", function() {{
+                // 1. Tile Google Đường phố
                 var googleStreets = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={{x}}&y={{y}}&z={{z}}', {{
                     maxZoom: 20,
                     attribution: 'Google Maps'
                 }});
 
+                // 2. Tile Google Vệ tinh
                 var googleSat = L.tileLayer('https://mt1.google.com/vt/lyrs=s,h&x={{x}}&y={{y}}&z={{z}}', {{
                     maxZoom: 20,
                     attribution: 'Google Maps Satellite'
                 }});
 
+                // 3. Khởi tạo Map (Tắt zoomControl mặc định góc trên để chủ động đặt dưới)
                 var map = L.map('map', {{
-                    zoomControl: false,
+                    zoomControl: false, // 👈 Tắt nút Zoom mặc định ở góc trên
                     attributionControl: false,
                     layers: [googleStreets]
                 }}).setView({json.dumps(map_center)}, {zoom_lvl});
 
+                // 4. Chuyển nút Zoom (+ / -) xuống CẠNH DƯỚI BÊN TRÁI
                 L.control.zoom({{
-                    position: 'bottomleft'
+                    position: 'bottomleft' // 👈 Chuyển xuống góc dưới bên trái
                 }}).addTo(map);
 
+                // 5. Chuyển Bảng chuyển lớp nền (Layer Map) xuống CẠNH DƯỚI BÊN PHẢI
                 var baseMaps = {{
                     "🗺️ Đường phố": googleStreets,
                     "🛰️ Vệ tinh": googleSat
                 }};
                 L.control.layers(baseMaps, null, {{ 
-                    position: 'bottomright'
+                    position: 'bottomright' // 👈 Chuyển xuống góc dưới bên phải
                 }}).addTo(map);
 
+                // 6. Vẽ tuyến cáp
                 var polylinesData = {json.dumps(polylines)};
                 polylinesData.forEach(function(item) {{
                     var line = L.polyline(item.coords, {{
@@ -459,6 +460,7 @@ if df is not None:
                     if (item.tooltip) line.bindTooltip(item.tooltip);
                 }});
 
+                // 7. Vẽ điểm kết nối (KN)
                 var markersData = {json.dumps(markers)};
                 markersData.forEach(function(item) {{
                     var circle = L.circleMarker(item.coords, {{
@@ -472,6 +474,7 @@ if df is not None:
                     if (item.tooltip) circle.bindTooltip(item.tooltip);
                 }});
 
+                // 8. Vẽ điểm đứt cáp
                 var breakMarkerData = {json.dumps(break_marker)};
                 if (breakMarkerData) {{
                     var breakIcon = L.divIcon({{ className: 'custom-break-icon' }});
@@ -480,6 +483,7 @@ if df is not None:
                     if (breakMarkerData.tooltip) bMarker.bindTooltip(breakMarkerData.tooltip);
                 }}
 
+                // 9. Định vị GPS người dùng
                 var userLatLng = null;
                 var userMarker = null;
                 var accuracyCircle = null;
@@ -512,6 +516,7 @@ if df is not None:
                 map.on('locationerror', onLocationError);
                 map.locate({{ watch: true, setView: false, enableHighAccuracy: true }});
 
+                // 10. Tính năng Chỉ đường Routing từ GPS đến Điểm Đứt cáp
                 var routingControl = null;
 
                 function drawRouteToDestination() {{
@@ -550,6 +555,7 @@ if df is not None:
                     }}).addTo(map);
                 }}
 
+                // 11. Tạo bảng điều khiển Nút Bấm GPS & Chỉ Đường (Góc trên bên trái)
                 var CustomControls = L.Control.extend({{
                     options: {{ position: 'topleft' }},
                     onAdd: function (map) {{
@@ -558,6 +564,7 @@ if df is not None:
                         container.style.flexDirection = 'column';
                         container.style.gap = '5px';
 
+                        // Nút định vị GPS
                         var btnLocate = L.DomUtil.create('div', 'leaflet-control-btn', container);
                         btnLocate.innerHTML = '🎯 GPS của tôi';
                         btnLocate.onclick = function() {{
@@ -568,6 +575,7 @@ if df is not None:
                             }}
                         }};
 
+                        // Nút chỉ đường
                         var btnRoute = L.DomUtil.create('div', 'leaflet-control-btn', container);
                         btnRoute.innerHTML = '🚗 Chỉ đường tới điểm sự cố';
                         btnRoute.style.backgroundColor = '#10B981';
@@ -587,6 +595,7 @@ if df is not None:
     </html>
     """
 
+    # Render bản đồ tràn màn hình bằng Streamlit components
     components.html(leaflet_html, height=1000, scrolling=False)
 
 else:
