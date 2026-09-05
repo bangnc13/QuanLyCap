@@ -24,7 +24,7 @@ st.markdown("""
             overflow: hidden !important;
         }
 
-        /* 2. Cấu hình Sidebar */
+        /* 2. Cấu hình Sidebar: Đưa nội dung sát top nhưng vẫn có khoảng đệm hài hòa */
         section[data-testid="stSidebar"] {
             z-index: 999999 !important;
         }
@@ -34,7 +34,7 @@ st.markdown("""
             padding-right: 1rem !important;
         }
 
-        /* 3. Nút đóng/mở Sidebar */
+        /* 3. Đưa nút đóng/mở Sidebar lên vị trí cố định trên cùng */
         [data-testid="stSidebarCollapseButton"], 
         [data-testid="collapsedControl"] {
             z-index: 1000000 !important;
@@ -47,7 +47,7 @@ st.markdown("""
             padding: 4px !important;
         }
 
-        /* 4. Tiêu đề Sidebar */
+        /* 4. Tối ưu tiêu đề trên cùng bên trái thanh Menu */
         .sidebar-title {
             font-size: 1.15rem !important;
             font-weight: 700 !important;
@@ -61,39 +61,41 @@ st.markdown("""
             margin-bottom: 12px !important;
         }
 
-        /* 5. Ẩn Header mặc định */
+        /* 5. Ẩn Header mặc định của Streamlit */
         header[data-testid="stHeader"] {
             background: transparent !important;
             height: 0px !important;
             z-index: 999999 !important;
         }
 
-        /* 6. Container chính tràn viền */
+        /* 6. Xóa khoảng trống container chính để map tràn viền tuyệt đối */
         .main .block-container, 
         [data-testid="stMainBlockContainer"],
         [data-testid="stVerticalBlock"],
-        [data-testid="stVerticalBlockBorderWrapper"],
-        [data-testid="element-container"],
-        .stCustomComponentV1 {
+        [data-testid="stVerticalBlockBorderWrapper"] {
             padding: 0 !important;
             margin: 0 !important;
             gap: 0rem !important;
-            width: 100vw !important;
-            height: 100vh !important;
             max-width: 100vw !important;
+            height: 100vh !important;
             max-height: 100vh !important;
         }
 
-        /* 7. Ép iframe Leaflet tràn màn hình */
+        /* 7. Ép iframe Leaflet tràn tuyệt đối toàn màn hình */
         iframe {
             width: 100vw !important;
             height: 100vh !important;
+            min-height: 100vh !important;
+            max-height: 100vh !important;
             border: none !important;
             margin: 0 !important;
             padding: 0 !important;
+            display: block !important;
             position: absolute !important;
             top: 0 !important;
             left: 0 !important;
+            bottom: 0 !important;
+            right: 0 !important;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -260,6 +262,7 @@ if df is not None:
         st.sidebar.error("📍 VỊ TRÍ ĐỨT CÁP DỰ KIẾN") 
         st.sidebar.markdown(f"**Đoạn cáp:** `{res['cable']}`") 
         
+        # Thẻ thông tin khoảng cách chi tiết đến 2 điểm kết nối
         st.sidebar.markdown("---")
         st.sidebar.markdown("**📐 Khoảng cách đến 2 điểm kết nối:**")
         st.sidebar.info(
@@ -289,6 +292,7 @@ if df is not None:
     markers = []
     break_marker = None
 
+    # Nếu ĐÃ TÍNH ĐƯỢC VỊ TRÍ ĐỨT -> Chỉ vẽ tuyến bị đứt
     if st.session_state.break_result: 
         u = st.session_state.break_result['from'] 
         v = st.session_state.break_result['to'] 
@@ -319,6 +323,7 @@ if df is not None:
                 "tooltip": "Vị trí đứt cáp"
             }
 
+    # Nếu CHƯA ĐO -> Hiển thị toàn bộ mạng cáp để quan sát tổng thể
     else: 
         for u, v, data in G.edges(data=True): 
             if u in node_coords and v in node_coords: 
@@ -339,29 +344,21 @@ if df is not None:
                 "radius": 4
             })
 
-    # Template HTML/JS Leaflet đã tối ưu lại kích thước
+    # Template HTML/JS render Leaflet
     leaflet_html = f"""
     <!DOCTYPE html>
     <html>
     <head>
         <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
         <style>
-            html, body {{
+            html, body, #map {{
                 width: 100%;
                 height: 100%;
                 margin: 0;
                 padding: 0;
-                overflow: hidden;
-            }}
-            #map {{
-                width: 100vw;
-                height: 100vh;
-                position: absolute;
-                top: 0;
-                left: 0;
             }}
             .custom-break-icon {{
                 background-color: #EF4444;
@@ -423,22 +420,13 @@ if df is not None:
                 if (breakMarkerData.popup) bMarker.bindPopup(breakMarkerData.popup).openPopup();
                 if (breakMarkerData.tooltip) bMarker.bindTooltip(breakMarkerData.tooltip);
             }}
-
-            // Tự động tính toán lại kích thước khung chứa bản đồ
-            setTimeout(function() {{
-                map.invalidateSize();
-            }}, 200);
-
-            window.addEventListener('resize', function() {{
-                map.invalidateSize();
-            }});
         </script>
     </body>
     </html>
     """
 
     # Hiển thị Leaflet Map qua Streamlit Components
-    components.html(leaflet_html, height=1080, scrolling=False)
+    components.html(leaflet_html, height=1000, scrolling=False)
 
 else: 
     st.error("❌ Không tìm thấy file Excel trên Server. Vui lòng kiểm tra lại tên file `Danh-Sách-Đoạn-Cáp.xlsx` trong thư mục chạy mã.")
