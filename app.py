@@ -1,13 +1,8 @@
- import os
-
+import os
 import networkx as nx
-
 import pandas as pd
-
 import streamlit as st
-
 import folium
-
 from streamlit_folium import st_folium
 
 
