@@ -212,7 +212,10 @@ if df is not None:
         map_center = [first_coord[0], first_coord[1]]
         zoom_lvl = 15
 
-    m = folium.Map(location=map_center, zoom_start=zoom_lvl, tiles="OpenStreetMap")
+    m = folium.Map(location=map_center, 
+    zoom_start=zoom_lvl, 
+    tiles="CartoDB positron"
+)
 
     # Vẽ Tuyến cáp
     if st.session_state.break_result:
