@@ -212,11 +212,10 @@ if df is not None:
         map_center = [first_coord[0], first_coord[1]]
         zoom_lvl = 15
 
-    m = folium.Map(
-    location=map_center,
-    zoom_start=zoom_lvl,
-    tiles="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-    attr="&copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors"
+   m = folium.Map(
+    location=map_center, 
+    zoom_start=zoom_lvl, 
+    tiles="CartoDB positron"
 )
 
 # 3. Thêm nút chuyển đổi Layer trên bản đồ
