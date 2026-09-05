@@ -1,8 +1,8 @@
-import os 
+import os
 import json
-import pandas as pd 
-import networkx as nx 
-import streamlit as st 
+import pandas as pd
+import networkx as nx
+import streamlit as st
 import streamlit.components.v1 as components
 
 # 1. Cấu hình trang Streamlit
@@ -10,7 +10,7 @@ st.set_page_config(
     page_title="Xác Định Vị Trí Đứt Cáp - BangNC13", 
     layout="wide", 
     initial_sidebar_state="expanded"
-) 
+)
 
 # CSS Tùy chỉnh giao diện Fullscreen & Sidebar
 st.markdown("""
@@ -108,7 +108,7 @@ st.sidebar.markdown('<div class="sidebar-title">⚡ TQG-XÁC ĐỊNH VỊ TRÍ �
 st.sidebar.markdown('<div class="sidebar-subtitle">Fiber Optic Break Location Finder - FPT Telecom System</div>', unsafe_allow_html=True)
 
 if df is not None: 
-    st.sidebar.success("🐒 Make by BangNC13") 
+    st.sidebar.success(f"📁 Dữ liệu: {file_name}") 
     
     df.columns = [str(col).strip() for col in df.columns] 
     
@@ -578,18 +578,16 @@ if df is not None:
                         return container;
                     }}
                 }});
-                map.addControl(new CustomControls());
 
-                setTimeout(function() {{
-                    map.invalidateSize();
-                }}, 200);
+                map.addControl(new CustomControls());
             }});
         </script>
     </body>
     </html>
     """
 
+    # Render bản đồ tràn màn hình bằng Streamlit components
     components.html(leaflet_html, height=1000, scrolling=False)
 
-else: 
-    st.error("❌ Không tìm thấy file Excel trên Server. Vui lòng kiểm tra lại file data trong thư mục.")
+else:
+    st.warning("⚠️ Không tìm thấy tệp dữ liệu Excel `.xlsx` hoặc `.xls` trong thư mục làm việc.")
