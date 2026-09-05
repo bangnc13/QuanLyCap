@@ -3,7 +3,6 @@ import networkx as nx
 import pandas as pd
 import streamlit as st
 import folium
-import branca
 from streamlit_folium import st_folium
 
 # 1. Cấu hình trang Streamlit
@@ -13,10 +12,10 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 2. CSS Tùy chỉnh: TRÀN SÁT MÉP TRÊN + NÚT MENU TRONG SUỐT 50%
+# 2. CSS Tùy chỉnh TRÀN MÀN HÌNH & BẢO TỒN NÚT ĐẨY SIDEBAR
 st.markdown("""
     <style>
-        /* 1. Reset nền và ẩn cuộn trang */
+        /* 1. Xóa cuộn trang chính và thụt lề nền */
         html, body, [data-testid="stAppViewContainer"], .main, .stApp {
             margin: 0 !important;
             padding: 0 !important;
@@ -24,60 +23,47 @@ st.markdown("""
             overflow: hidden !important;
         }
 
-        /* 2. An toàn triệt tiêu Header Streamlit */
+        /* 2. Triệt tiêu nền Header nhưng GIỮ LẠI các nút hệ thống */
         header[data-testid="stHeader"] {
             background: transparent !important;
             height: 0px !important;
             z-index: 999999 !important;
         }
 
-        /* 3. NÚT CHUYỂN MENU (MỞ/ẨN SIDEBAR) VỚI ĐỘ TRONG SUỐT 50% */
+        /* 3. Đưa nút Mở/Ẩn Sidebar lên lớp ưu tiên cao nhất để luôn click được */
         [data-testid="stSidebarCollapseButton"], 
         [data-testid="collapsedControl"] {
             z-index: 1000000 !important;
             position: fixed !important;
-            top: 12px !important;
-            left: 12px !important;
-            /* Màu nền FPT Brand với độ trong suốt 50% (alpha = 0.5) */
-            background: rgba(243, 111, 33, 0.5) !important; 
-            color: #ffffff !important;
+            top: 10px !important;
+            left: 10px !important;
+            background-color: rgba(255, 255, 255, 0.9) !important;
             border-radius: 50% !important;
-            border: 1px solid rgba(255, 255, 255, 0.6) !important;
-            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3) !important;
-            padding: 6px !important;
-            backdrop-filter: blur(4px) !important; /* Làm mờ nhẹ nền đằng sau nút */
-            transition: all 0.3s ease !important;
+            box-shadow: 0px 2px 6px rgba(0,0,0,0.3) !important;
+            padding: 4px !important;
         }
 
-        /* Hiệu ứng khi rê chuột vào nút Menu */
-        [data-testid="stSidebarCollapseButton"]:hover, 
-        [data-testid="collapsedControl"]:hover {
-            background: rgba(243, 111, 33, 0.85) !important;
-            transform: scale(1.1);
-        }
-
-        /* 4. ĐẨY BẢN ĐỒ TRÀN SÁT CẠNH TRÊN TUYỆT ĐỐI */
+        /* 4. Xóa khoảng trắng phía trên Container nội dung chính */
         .main .block-container, 
         [data-testid="stMainBlockContainer"],
         [data-testid="stVerticalBlock"] {
             padding: 0 !important;
             margin: 0 !important;
-            margin-top: -80px !important; /* Đẩy nội dung đè lên hết khoảng trống Header */
             gap: 0rem !important;
             max-width: 100vw !important;
         }
 
-        /* 5. Căn kích thước Viewport cho iframe chứa bản đồ */
+        /* 5. Căn bản đồ tràn 100% màn hình tự nhiên */
         [data-testid="element-container"], .stCustomComponentV1, iframe {
             width: 100vw !important;
-            height: calc(100vh + 80px) !important;
+            height: 100vh !important;
             border: none !important;
             margin: 0 !important;
             padding: 0 !important;
             display: block !important;
         }
 
-        /* 6. Sidebar nổi đè lên trên bản đồ */
+        /* 6. Đảm bảo Sidebar nằm đè lên bản đồ khi mở */
         section[data-testid="stSidebar"] {
             z-index: 999999 !important;
         }
@@ -248,7 +234,7 @@ if df is not None:
             st.sidebar.markdown(f"📍 **GPS:** `{gps[0]:.6f}, {gps[1]:.6f}`")
             st.sidebar.markdown(f"👉 [**Mở trên Google Maps**]({gmap_url})")
 
-    # Khởi tạo vị trí Bản đồ
+    # Bản đồ
     map_center = [21.0285, 105.8542]
     zoom_lvl = 12
 
@@ -260,12 +246,15 @@ if df is not None:
         map_center = [first_coord[0], first_coord[1]]
         zoom_lvl = 15
 
-    # Đặt zoom_control=False để ẩn nút điều khiển mặc định phía trên
+    # Đặt zoom_control=False để ẩn nút zoom mặc định ở góc trên
     m = folium.Map(location=map_center, zoom_start=zoom_lvl, tiles=None, zoom_control=False)
 
-    # Chuyển cụm phím Zoom (+ / -) xuống góc dưới bên phải
+    # Thêm nút zoom vào góc dưới bên phải
+    folium.plugins.FloatWithClick().add_to(m) if hasattr(folium.plugins, 'FloatWithClick') else None
+    
+    # Tạo nút Zoom ở góc dưới bên phải bằng JavaScript/Macro của Folium
     macro = folium.MacroElement()
-    macro._template = branca.element.Template("""
+    macro._template = folium.branca.element.Template("""
         {% macro script(this, kwargs) %}
             L.control.zoom({
                 position: 'bottomright'
