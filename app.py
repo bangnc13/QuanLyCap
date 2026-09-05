@@ -331,7 +331,7 @@ if df is not None:
                 "radius": 4
             })
 
-    # Leaflet HTML - Tích hợp Tile Google, Định vị GPS và Routing Chỉ Đường
+    # Leaflet HTML - Tích hợp Tile Google, Định vị GPS và Routing Chỉ Đường (Đã ẩn khung chỉ dẫn từng bước)
     leaflet_html = f"""
     <!DOCTYPE html>
     <html>
@@ -402,11 +402,9 @@ if df is not None:
             .leaflet-control-btn:hover {{
                 background-color: #f4f4f4;
             }}
-            .leaflet-control-container .leaflet-routing-container {{
-                max-width: 280px;
-                font-family: Arial, sans-serif;
-                font-size: 12px;
-                opacity: 0.9;
+            /* ẨN HOÀN TOÀN KHUNG HƯỚNG DẪN TỪNG BƯỚC ĐỂ TIẾT KIỆM DIỆN TÍCH MÀN HÌNH DI ĐỘNG */
+            .leaflet-routing-container {{
+                display: none !important;
             }}
         </style>
     </head>
@@ -507,7 +505,7 @@ if df is not None:
                 map.on('locationerror', onLocationError);
                 map.locate({{ watch: true, setView: false, enableHighAccuracy: true }});
 
-                // 9. Tính năng Chỉ đường Routing từ GPS đến Điểm Đứt cáp
+                // 9. Tính năng Chỉ đường Routing từ GPS đến Điểm Đứt cáp (Đã ẩn khung chỉ dẫn từng bước)
                 var routingControl = null;
 
                 function drawRouteToDestination() {{
@@ -539,7 +537,7 @@ if df is not None:
                         ],
                         routeWhileDragging: false,
                         addWaypoints: false,
-                        show: true,
+                        show: false, // Ẩn khung hiển thị hướng dẫn
                         lineOptions: {{
                             styles: [{{ color: '#059669', opacity: 0.8, weight: 6 }}]
                         }}
