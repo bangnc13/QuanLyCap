@@ -6,33 +6,18 @@ import folium
 from streamlit_folium import st_folium
 
 # 1. Cấu hình trang Streamlit
-st.set_page_config(page_title="Xác Định Vị Trí Đứt Cáp - BangNC13", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Xác Định Vị Trí Đứt Cáp Make by BangNC13", layout="wide", initial_sidebar_state="expanded")
 
-# Khởi tạo session state
+# Khởi tạo session state lưu kết quả
 if "break_result" not in st.session_state:
     st.session_state.break_result = None
 if "break_gps" not in st.session_state:
     st.session_state.break_gps = None
-if "map_key" not in st.session_state:
-    st.session_state.map_key = 0
-
-# Hàm kiểm tra Tọa độ hợp lệ
-def isValidCoord(lat, lon):
-    try:
-        lat, lon = float(lat), float(lon)
-        # Vĩ độ Việt Nam ~8 đến 24, Kinh độ ~102 đến 110
-        if 8.0 <= lat <= 24.0 and 102.0 <= lon <= 110.0:
-            return lat, lon
-        # Trường hợp bị ngược Kinh/Vĩ độ
-        if 8.0 <= lon <= 24.0 and 102.0 <= lat <= 110.0:
-            return lon, lat
-    except (ValueError, TypeError):
-        return None
-    return None
 
 # Hàm tự động tìm và đọc file Excel có sẵn trên Server
 @st.cache_data
 def load_server_data():
+    # Tìm các tên file Excel mặc định trên thư mục Server
     possible_files = [
         "Danh-Sách-Đoạn-Cáp.xlsx", 
         "Danh_Sach_Doan_Cap.xlsx", 
@@ -46,6 +31,7 @@ def load_server_data():
             selected_file = f
             break
 
+    # Nếu không tìm thấy các tên cố định, quét lấy file .xlsx đầu tiên
     if not selected_file:
         files = [f for f in os.listdir(".") if f.endswith(".xlsx") or f.endswith(".xls")]
         if files:
@@ -56,22 +42,22 @@ def load_server_data():
         return df, selected_file
     return None, None
 
-st.title("⚡ TQG - XÁC ĐỊNH VỊ TRÍ ĐỨT CÁP")
+st.title("⚡ TQG-XÁC ĐỊNH VỊ TRÍ ĐỨT CÁP ")
 st.caption("Fiber Optic Break Location Finder - FPT Telecom System")
 
 # 2. Tải Dữ Liệu Từ Server
 df, file_name = load_server_data()
 
 if df is not None:
-    st.sidebar.success(f"🐒 Make by BangNC13 ")
+    st.sidebar.success(f"🐒 Make by BangNC13")
     
     df.columns = [str(col).strip() for col in df.columns]
     
     # Tự động tìm các cột Tọa độ
     lat_col1 = next((c for c in df.columns if 'lat' in c.lower() and '1' in c.lower()), None)
-    lon_col1 = next((c for c in df.columns if ('lng' in c.lower() or 'lon' in c.lower()) and '1' in c.lower()), None)
+    lon_col1 = next((c for c in df.columns if 'lng' in c.lower() or ('lon' in c.lower() and '1' in c.lower())), None)
     lat_col2 = next((c for c in df.columns if 'lat' in c.lower() and '2' in c.lower()), None)
-    lon_col2 = next((c for c in df.columns if ('lng' in c.lower() or 'lon' in c.lower()) and '2' in c.lower()), None)
+    lon_col2 = next((c for c in df.columns if 'lng' in c.lower() or ('lon' in c.lower() and '2' in c.lower())), None)
 
     if not lat_col1:
         lat_col1 = next((c for c in df.columns if 'lat' in c.lower() or 'vĩ độ' in c.lower()), None)
@@ -96,23 +82,17 @@ if df is not None:
         cable = str(row.get('Tên đoạn cáp', f"{k1}-{k2}")).strip()
         
         len_val = row.get('Chiều dài thực (m)')
-        try:
-            length = float(len_val) if pd.notnull(len_val) else 0.0
-        except Exception:
-            length = 0.0
+        length = float(len_val) if pd.notnull(len_val) else 0.0
         
-        # Parse tọa độ an toàn
-        if lat_col1 and lon_col1 and pd.notnull(row.get(lat_col1)) and pd.notnull(row.get(lon_col1)):
-            coord1 = isValidCoord(row[lat_col1], row[lon_col1])
-            if coord1:
-                node_coords[k1] = coord1
-                
-        if lat_col2 and lon_col2 and pd.notnull(row.get(lat_col2)) and pd.notnull(row.get(lon_col2)):
-            coord2 = isValidCoord(row[lat_col2], row[lon_col2])
-            if coord2:
-                node_coords[k2] = coord2
+        try:
+            if lat_col1 and lon_col1 and pd.notnull(row[lat_col1]) and pd.notnull(row[lon_col1]):
+                node_coords[k1] = (float(row[lat_col1]), float(row[lon_col1]))
+            if lat_col2 and lon_col2 and pd.notnull(row[lat_col2]) and pd.notnull(row[lon_col2]):
+                node_coords[k2] = (float(row[lat_col2]), float(row[lon_col2]))
+        except Exception:
+            pass
 
-        if k1 and k2 and k1 != 'nan' and k2 != 'nan':
+        if k1 and k2:
             G.add_edge(k1, k2, cable=cable, length=length)
 
     st.sidebar.markdown("---")
@@ -134,7 +114,6 @@ if df is not None:
         if btn_reset:
             st.session_state.break_result = None
             st.session_state.break_gps = None
-            st.session_state.map_key += 1
             st.rerun()
 
         # Tính toán điểm đứt
@@ -184,9 +163,8 @@ if df is not None:
 
             st.session_state.break_result = b_res
             st.session_state.break_gps = b_gps
-            st.session_state.map_key += 1
 
-    # Sidebar Display Kết quả
+    # Display Báo lỗi / Vị trí đứt ở Sidebar
     if st.session_state.break_result:
         res = st.session_state.break_result
         st.sidebar.error("📍 VỊ TRÍ ĐỨT CÁP DỰ KIẾN")
@@ -200,8 +178,8 @@ if df is not None:
             st.sidebar.markdown(f"📍 **GPS:** `{gps[0]:.6f}, {gps[1]:.6f}`")
             st.sidebar.markdown(f"👉 [**Mở trên Google Maps**]({gmap_url})")
 
-    # 3. Khởi tạo Bản đồ
-    map_center = [21.0285, 105.8542] # Default Hà Nội
+    # 3. Hiển thị Bản đồ
+    map_center = [21.0285, 105.8542]
     zoom_lvl = 12
 
     if st.session_state.break_gps:
@@ -212,16 +190,9 @@ if df is not None:
         map_center = [first_coord[0], first_coord[1]]
         zoom_lvl = 15
 
-   m = folium.Map(
-    location=map_center, 
-    zoom_start=zoom_lvl, 
-    tiles="CartoDB positron"
-)
+    m = folium.Map(location=map_center, zoom_start=zoom_lvl, tiles="OpenStreetMap")
 
-# 3. Thêm nút chuyển đổi Layer trên bản đồ
-folium.LayerControl().add_to(m)
-
-    # Vẽ Tuyến cáp
+    # Nếu ĐÃ TÍNH ĐƯỢC VỊ TRÍ ĐỨT -> Chỉ vẽ tuyến bị đứt
     if st.session_state.break_result:
         u = st.session_state.break_result['from']
         v = st.session_state.break_result['to']
@@ -229,15 +200,21 @@ folium.LayerControl().add_to(m)
         if u in node_coords and v in node_coords:
             folium.PolyLine(
                 locations=[node_coords[u], node_coords[v]],
-                color="red", weight=6, opacity=0.9,
+                color="red",
+                weight=6,
+                opacity=0.9,
                 tooltip=f"Sự cố đoạn: {st.session_state.break_result['cable']}"
             ).add_to(m)
 
             for node in [u, v]:
                 folium.CircleMarker(
                     location=node_coords[node],
-                    radius=7, popup=f"Điểm KN: {node}", tooltip=f"Điểm KN: {node}",
-                    color="blue", fill=True, fill_color="white"
+                    radius=7,
+                    popup=f"Điểm KN: {node}",
+                    tooltip=f"Điểm KN: {node}",
+                    color="blue",
+                    fill=True,
+                    fill_color="white"
                 ).add_to(m)
 
         if st.session_state.break_gps:
@@ -248,25 +225,30 @@ folium.LayerControl().add_to(m)
                 icon=folium.Icon(color="red", icon="warning", prefix="fa")
             ).add_to(m)
 
+    # Nếu CHƯA ĐO -> Hiển thị toàn bộ mạng cáp để quan sát tổng thể
     else:
-        # Vẽ toàn bộ mạng cáp
         for u, v, data in G.edges(data=True):
             if u in node_coords and v in node_coords:
                 folium.PolyLine(
                     locations=[node_coords[u], node_coords[v]],
-                    color="#2b5c8f", weight=3, opacity=0.6,
+                    color="#2b5c8f",
+                    weight=3,
+                    opacity=0.6,
                     tooltip=f"Cáp: {data.get('cable', '')}"
                 ).add_to(m)
 
         for node_id, coord in node_coords.items():
             folium.CircleMarker(
-                location=coord, radius=4,
-                popup=f"Điểm KN: {node_id}", tooltip=node_id,
-                color="#2b5c8f", fill=True, fill_color="white"
+                location=coord,
+                radius=4,
+                popup=f"Điểm KN: {node_id}",
+                tooltip=node_id,
+                color="#2b5c8f",
+                fill=True,
+                fill_color="white"
             ).add_to(m)
 
-    # Hiển thị bản đồ với key động để buộc Streamlit vẽ lại khi bấm nút
-    st_folium(m, width="100%", height=650, key=f"folium_map_{st.session_state.map_key}")
+    st_folium(m, width=1100, height=650, key="folium_map")
 
 else:
-    st.error("❌ Không tìm thấy file Excel trên Server. Vui lòng kiểm tra lại file `Danh-Sách-Đoạn-Cáp.xlsx`.")
+    st.error("❌ Không tìm thấy file Excel trên Server. Vui lòng kiểm tra lại tên file `Danh-Sách-Đoạn-Cáp.xlsx` trong thư mục chạy mã.")
