@@ -13,7 +13,7 @@ st.set_page_config(
     initial_sidebar_state="expanded" 
 ) 
  
-# 2. CSS Tùy chỉnh TRÀN MÀN HÌNH CHUẨN
+# 2. CSS Tùy chỉnh TRÀN MÀN HÌNH PERFECT
 st.markdown(""" 
     <style> 
         /* Xóa cuộn trang chính */ 
@@ -31,7 +31,7 @@ st.markdown("""
             z-index: 999999 !important; 
         } 
  
-        /* Đưa nút Sidebar lên ưu tiên cao nhất */ 
+        /* Đưa nút Toggle Sidebar lên trên cùng */ 
         [data-testid="stSidebarCollapseButton"],  
         [data-testid="collapsedControl"] { 
             z-index: 1000000 !important; 
@@ -55,7 +55,7 @@ st.markdown("""
             height: 100vh !important;
         } 
  
-        /* Ép iframe Bản đồ phủ full màn hình hiển thị */ 
+        /* Ép iframe Bản đồ phủ kín màn hình */ 
         [data-testid="element-container"], .stCustomComponentV1, iframe { 
             width: 100vw !important; 
             height: 100vh !important; 
@@ -239,19 +239,24 @@ if df is not None:
             st.sidebar.markdown(f"📍 **GPS:** `{gps[0]:.6f}, {gps[1]:.6f}`") 
             st.sidebar.markdown(f"👉 [**Mở trên Google Maps**]({gmap_url})") 
  
-    # Tính toán tọa độ tâm
+    # Tính toán vị trí tâm bản đồ
     map_center = [21.0285, 105.8542] 
     zoom_lvl = 12 
  
     if st.session_state.break_gps: 
-        map_center = st.session_state.break_gps 
+        # Lấy tọa độ gốc điểm đứt cáp
+        lat, lon = st.session_state.break_gps 
         zoom_lvl = 17 
+        
+        # Bù độ lệch kinh độ (Longitude Offset) khoảng -0.0015 độ 
+        # để đẩy tâm bản đồ sang trái, giúp điểm đứt cáp hiển thị đúng ở giữa phần bản đồ hở (ngoài Sidebar)
+        map_center = [lat, lon - 0.0015] 
     elif len(node_coords) > 0: 
         first_coord = list(node_coords.values())[0] 
         map_center = [first_coord[0], first_coord[1]] 
         zoom_lvl = 15 
  
-    # Khởi tạo bản đồ
+    # Khởi tạo bản đồ Folium
     m = folium.Map(location=map_center, zoom_start=zoom_lvl, tiles=None) 
  
     folium.TileLayer( 
@@ -325,8 +330,7 @@ if df is not None:
                 fill_color="white" 
             ).add_to(m) 
  
-    # Đặt chiều cao số cố định cho st_folium để render iframe ổn định,
-    # CSS phía trên sẽ chịu trách nhiệm giãn iframe ra toàn màn hình hiển thị.
+    # Render bản đồ với Key động theo GPS
     st_folium(
         m, 
         use_container_width=True, 
