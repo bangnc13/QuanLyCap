@@ -12,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 ) 
 
-# CSS Tùy chỉnh
+# CSS Tùy chỉnh giao diện full screen
 st.markdown("""
     <style>
         html, body, [data-testid="stAppViewContainer"], .main, .stApp {
@@ -71,7 +71,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Khởi tạo session state lưu kết quả 
+# Khởi tạo session state
 if "break_result" not in st.session_state: 
     st.session_state.break_result = None 
 if "break_gps" not in st.session_state: 
@@ -220,6 +220,7 @@ if df is not None:
             st.session_state.break_gps = b_gps 
             st.rerun() 
 
+    # Hiển thị trên Sidebar khi có kết quả
     if st.session_state.break_result: 
         res = st.session_state.break_result 
         st.sidebar.error("📍 VỊ TRÍ ĐỨT CÁP DỰ KIẾN") 
@@ -236,7 +237,7 @@ if df is not None:
             gps = st.session_state.break_gps 
             gmap_url = f"https://www.google.com/maps?q={gps[0]},{gps[1]}" 
             st.sidebar.markdown(f"📍 **GPS:** `{gps[0]:.6f}, {gps[1]:.6f}`") 
-            st.sidebar.markdown(f"👉 [**Mở trên Google Maps**]({gmap_url})") 
+            st.sidebar.link_button("📍 Mở trên Google Maps", gmap_url, type="primary", use_container_width=True)
 
     # 3. Chuẩn bị Dữ liệu Render Bản đồ Leaflet JS
     map_center = [21.0285, 105.8542] 
@@ -244,7 +245,7 @@ if df is not None:
 
     if st.session_state.break_gps: 
         map_center = list(st.session_state.break_gps)
-        zoom_lvl = 17 
+        zoom_lvl = 18 
     elif len(node_coords) > 0: 
         first_coord = list(node_coords.values())[0] 
         map_center = [first_coord[0], first_coord[1]] 
@@ -270,18 +271,45 @@ if df is not None:
             for node in [u, v]: 
                 markers.append({
                     "coords": node_coords[node],
-                    "popup": f"Điểm KN: {node}",
+                    "popup": f"<b>Điểm Kết Nối:</b> {node}",
                     "tooltip": f"Điểm KN: {node}",
                     "color": "#3B82F6",
-                    "radius": 8
+                    "radius": 7
                 })
 
         if st.session_state.break_gps: 
             res = st.session_state.break_result
+            gps = st.session_state.break_gps
+            gmap_url = f"https://www.google.com/maps?q={gps[0]},{gps[1]}"
+            
+            # HTML cho Popup điểm đứt có nút bấm Google Maps
+            popup_html = f"""
+            <div style="font-family: Arial, sans-serif; min-width: 180px;">
+                <b style="color: #DC2626; font-size: 13px;">🚨 VỊ TRÍ ĐỨT CÁP: {res['cable']}</b><br/>
+                <div style="margin: 6px 0; font-size: 12px; line-height: 1.4;">
+                    • Cách <b>{res['from']}</b>: {res['d1']:.1f}m<br/>
+                    • Cách <b>{res['to']}</b>: {res['d2']:.1f}m
+                </div>
+                <a href="{gmap_url}" target="_blank" style="
+                    display: inline-block;
+                    width: 100%;
+                    text-align: center;
+                    background-color: #10B981;
+                    color: white;
+                    padding: 6px 0;
+                    margin-top: 4px;
+                    border-radius: 4px;
+                    text-decoration: none;
+                    font-weight: bold;
+                    font-size: 11px;
+                ">📍 Mở trên Google Maps</a>
+            </div>
+            """
+            
             break_marker = {
                 "coords": list(st.session_state.break_gps),
-                "popup": f"<b>🚨 VỊ TRÍ ĐỨT CÁP: {res['cable']}</b><br>• Cách {res['from']}: {res['d1']:.1f}m<br>• Cách {res['to']}: {res['d2']:.1f}m",
-                "tooltip": "Vị trí đứt cáp"
+                "popup": popup_html,
+                "tooltip": "🚨 Vị trí đứt cáp dự kiến"
             }
 
     else: 
@@ -298,13 +326,13 @@ if df is not None:
         for node_id, coord in node_coords.items(): 
             markers.append({
                 "coords": coord,
-                "popup": f"Điểm KN: {node_id}",
+                "popup": f"<b>Điểm KN:</b> {node_id}",
                 "tooltip": str(node_id),
                 "color": "#2B5C8F",
                 "radius": 4
             })
 
-    # Sửa lại HTML/JS của Leaflet dùng CartoDB Tile Server (đảm bảo hiển thị 100%)
+    # Leaflet HTML bổ sung Nút chuyển đổi Layer (Vệ tinh / Phố) + Sửa nguồn Tile miễn phí
     leaflet_html = f"""
     <!DOCTYPE html>
     <html>
@@ -324,7 +352,7 @@ if df is not None:
             #map {{
                 width: 100%;
                 height: 100vh;
-                background-color: #e5e3df;
+                background-color: #1a1a1a;
             }}
             .custom-break-icon {{
                 background-color: #EF4444;
@@ -342,23 +370,43 @@ if df is not None:
                 70% {{ transform: scale(1.2); box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); }}
                 100% {{ transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }}
             }}
+            .leaflet-control-layers {{
+                font-family: Arial, sans-serif;
+                border-radius: 8px !important;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
+            }}
         </style>
     </head>
     <body>
         <div id="map"></div>
         <script>
             document.addEventListener("DOMContentLoaded", function() {{
+                // 1. Tạo các Layer Tile miễn phí (Không cần API Key)
+                var streetMap = L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
+                    maxZoom: 19,
+                    attribution: 'OpenStreetMap'
+                }});
+
+                var satelliteMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{{z}}/{{y}}/{{x}}', {{
+                    maxZoom: 19,
+                    attribution: 'Esri Satellite'
+                }});
+
+                // 2. Khởi tạo bản đồ với mặc định là Bản đồ Phố
                 var map = L.map('map', {{
                     zoomControl: true,
-                    attributionControl: false
+                    attributionControl: false,
+                    layers: [streetMap]
                 }}).setView({json.dumps(map_center)}, {zoom_lvl});
 
-                // Sử dụng CartoDB Voyager Tile giúp load nhanh và không bị block Tile
-                L.tileLayer('https://{{s}}.basemaps.cartocdn.com/rastertiles/voyager/{{z}}/{{x}}/{{y}}{{r}}.png', {{
-                    maxZoom: 19,
-                    subdomains: 'abcd'
-                }}).addTo(map);
+                // 3. Thêm Control Layer ở góc trên bên phải
+                var baseMaps = {{
+                    "🗺️ Đường phố": streetMap,
+                    "🛰️ Vệ tinh": satelliteMap
+                }};
+                L.control.layers(baseMaps, null, {{ position: 'topright' }}).addTo(map);
 
+                // 4. Vẽ các tuyến cáp (Polylines)
                 var polylinesData = {json.dumps(polylines)};
                 polylinesData.forEach(function(item) {{
                     var line = L.polyline(item.coords, {{
@@ -369,6 +417,7 @@ if df is not None:
                     if (item.tooltip) line.bindTooltip(item.tooltip);
                 }});
 
+                // 5. Vẽ điểm KN (Markers)
                 var markersData = {json.dumps(markers)};
                 markersData.forEach(function(item) {{
                     var circle = L.circleMarker(item.coords, {{
@@ -382,6 +431,7 @@ if df is not None:
                     if (item.tooltip) circle.bindTooltip(item.tooltip);
                 }});
 
+                // 6. Vẽ vị trí đứt cáp (Break Marker)
                 var breakMarkerData = {json.dumps(break_marker)};
                 if (breakMarkerData) {{
                     var breakIcon = L.divIcon({{ className: 'custom-break-icon' }});
@@ -390,7 +440,7 @@ if df is not None:
                     if (breakMarkerData.tooltip) bMarker.bindTooltip(breakMarkerData.tooltip);
                 }}
 
-                // Bắt buộc tính lại kích thước Map tránh lỗi màn hình xám trong Iframe Streamlit
+                // Force resize map để tránh lỗi màu xám iframe Streamlit
                 setTimeout(function() {{
                     map.invalidateSize();
                 }}, 300);
@@ -400,7 +450,7 @@ if df is not None:
     </html>
     """
 
-    # Render Leaflet Map
+    # Render HTML Map
     components.html(leaflet_html, height=1000, scrolling=False)
 
 else: 
