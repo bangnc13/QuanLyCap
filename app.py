@@ -13,25 +13,26 @@ st.set_page_config(
     initial_sidebar_state="expanded" 
 ) 
  
-# 2. CSS Tùy chỉnh TRÀN MÀN HÌNH PERFECT
+# 2. CSS Tùy chỉnh TRÀN MÀN HÌNH TỐI ĐA (KHÔNG KHOẢNG TRẮNG CẠNH DƯỚI)
 st.markdown(""" 
     <style> 
-        /* Xóa cuộn trang chính */ 
+        /* 1. Xóa cuộn và khoảng thừa cấp Root */ 
         html, body, [data-testid="stAppViewContainer"], .main, .stApp { 
             margin: 0 !important; 
             padding: 0 !important; 
             height: 100vh !important; 
+            max-height: 100vh !important; 
             overflow: hidden !important; 
         } 
  
-        /* Triệt tiêu nền Header */ 
+        /* 2. Triệt tiêu nền và chiều cao Header */ 
         header[data-testid="stHeader"] { 
             background: transparent !important; 
             height: 0px !important; 
             z-index: 999999 !important; 
         } 
  
-        /* Đưa nút Toggle Sidebar lên trên cùng */ 
+        /* 3. Đưa nút Sidebar lên trên cùng */ 
         [data-testid="stSidebarCollapseButton"],  
         [data-testid="collapsedControl"] { 
             z-index: 1000000 !important; 
@@ -44,25 +45,37 @@ st.markdown("""
             padding: 4px !important; 
         } 
  
-        /* Xóa padding container chính */ 
+        /* 4. Ép container chính không còn khoảng trống thừa */ 
         .main .block-container,  
         [data-testid="stMainBlockContainer"], 
-        [data-testid="stVerticalBlock"] { 
+        [data-testid="stVerticalBlock"],
+        [data-testid="stVerticalBlockBorderWrapper"] { 
             padding: 0 !important; 
             margin: 0 !important; 
             gap: 0rem !important; 
             max-width: 100vw !important; 
-            height: 100vh !important;
+            height: 100vh !important; 
+            max-height: 100vh !important;
         } 
  
-        /* Ép iframe Bản đồ phủ kín màn hình */ 
-        [data-testid="element-container"], .stCustomComponentV1, iframe { 
+        /* 5. Ép TẤT CẢ wrapper cha của iframe bản đồ kéo dãn sát cạnh dưới */ 
+        [data-testid="element-container"], 
+        .stCustomComponentV1, 
+        div[data-testid="stCustomComponentV1"],
+        iframe { 
             width: 100vw !important; 
             height: 100vh !important; 
+            min-height: 100vh !important;
+            max-height: 100vh !important; 
             border: none !important; 
             margin: 0 !important; 
             padding: 0 !important; 
             display: block !important; 
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            bottom: 0 !important;
+            right: 0 !important;
         } 
  
         section[data-testid="stSidebar"] { 
@@ -244,12 +257,8 @@ if df is not None:
     zoom_lvl = 12 
  
     if st.session_state.break_gps: 
-        # Lấy tọa độ gốc điểm đứt cáp
         lat, lon = st.session_state.break_gps 
         zoom_lvl = 17 
-        
-        # Bù độ lệch kinh độ (Longitude Offset) khoảng -0.0015 độ 
-        # để đẩy tâm bản đồ sang trái, giúp điểm đứt cáp hiển thị đúng ở giữa phần bản đồ hở (ngoài Sidebar)
         map_center = [lat, lon - 0.0015] 
     elif len(node_coords) > 0: 
         first_coord = list(node_coords.values())[0] 
@@ -330,11 +339,11 @@ if df is not None:
                 fill_color="white" 
             ).add_to(m) 
  
-    # Render bản đồ với Key động theo GPS
+    # Render bản đồ tràn tuyệt đối
     st_folium(
         m, 
         use_container_width=True, 
-        height=800, 
+        height=1000, 
         key=f"folium_map_{st.session_state.break_gps}"
     ) 
  
