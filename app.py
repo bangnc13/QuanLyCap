@@ -13,7 +13,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 2. CSS Tùy chỉnh
+# 2. CSS Tùy chỉnh: ĐIỀU CHỈNH ĐỘ TRONG SUỐT NÚT MENU TẠI CÁC TRẠNG THÁI
 st.markdown("""
     <style>
         /* 1. Reset nền và ẩn cuộn trang */
@@ -24,52 +24,70 @@ st.markdown("""
             overflow: hidden !important;
         }
 
-        /* 2. An toàn triệt tiêu Header Streamlit */
+        /* 2. Triệt tiêu Header Streamlit */
         header[data-testid="stHeader"] {
             background: transparent !important;
             height: 0px !important;
             z-index: 999999 !important;
         }
 
-        /* 3. THIẾT LẬP NÚT CHUYỂN ĐỔI MENU (MỞ / ẨN SIDEBAR) */
-        
-        /* Khi Sidebar đang MỞ (Mặc định nút thu gọn nằm trong Header) */
+        /* 3.1 NÚT KHI SIDEBAR ĐANG MỞ (Thu gọn sidebar) */
         [data-testid="stSidebarCollapseButton"] {
             z-index: 1000000 !important;
-            background-color: rgba(255, 255, 255, 0.3) !important; /* Màu trắng độ trong suốt 30% */
-            color: #000000 !important;
+            background: rgba(255, 255, 255, 0.7) !important;
+            color: #333333 !important;
             border-radius: 50% !important;
             border: 1px solid rgba(0, 0, 0, 0.1) !important;
-            box-shadow: 0px 2px 6px rgba(0, 0, 0, 0.2) !important;
+            box-shadow: 0px 2px 6px rgba(0, 0, 0, 0.15) !important;
             padding: 4px !important;
-            backdrop-filter: blur(3px) !important;
+            backdrop-filter: blur(4px) !important;
             transition: all 0.3s ease !important;
         }
 
-        /* Khi Sidebar BỊ ẨN (Nút mở lại menu hiển thị ngoài màn hình Full Map) */
+        /* 3.2 NÚT KHI SIDEBAR ĐÃ BỊ ẨN (Mở lại sidebar trên bản đồ) -> ĐỘ TRONG SUỐT 50% */
         [data-testid="collapsedControl"] {
             z-index: 1000000 !important;
             position: fixed !important;
             top: 12px !important;
             left: 12px !important;
-            background-color: rgba(255, 255, 255, 0.7) !important; /* Màu trắng độ trong suốt 70% */
-            color: #000000 !important;
+            /* Nền màu cam FPT với độ trong suốt 50% */
+            background: rgba(243, 111, 33, 0.5) !important; 
+            color: #ffffff !important;
             border-radius: 50% !important;
-            border: 1px solid rgba(0, 0, 0, 0.2) !important;
-            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3) !important;
-            padding: 6px !important;
+            border: 1px solid rgba(255, 255, 255, 0.8) !important;
+            box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.3) !important;
+            padding: 8px !important;
             backdrop-filter: blur(4px) !important;
             transition: all 0.3s ease !important;
         }
 
-        /* Hiệu ứng Rê chuột (Hover) */
-        [data-testid="stSidebarCollapseButton"]:hover, 
+        /* Hiệu ứng rê chuột (Hover) cho nút khi đang ẩn sidebar */
         [data-testid="collapsedControl"]:hover {
-            background-color: rgba(255, 255, 255, 0.95) !important;
-            transform: scale(1.08);
+            background: rgba(243, 111, 33, 0.9) !important;
+            transform: scale(1.15);
         }
 
-        /* 4. ĐẨY BẢN ĐỒ TRÀN SÁT CẠNH TRÊN TUYỆT ĐỐI */
+        /* Hiệu ứng rê chuột (Hover) cho nút khi đang mở sidebar */
+        [data-testid="stSidebarCollapseButton"]:hover {
+            background: rgba(255, 255, 255, 0.95) !important;
+            transform: scale(1.1);
+        }
+
+        /* 4. STYLE BADGE "MAKE BY BANGNC13" VIỀN BO TRÒN MÀU XANH */
+        .author-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #0056b3;
+            background-color: #eef6ff;
+            border: 1px solid #007bff;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            letter-spacing: 0.3px;
+        }
+
+        /* 5. ĐẨY BẢN ĐỒ TRÀN SÁT CẠNH TRÊN TUYỆT ĐỐI */
         .main .block-container, 
         [data-testid="stMainBlockContainer"],
         [data-testid="stVerticalBlock"] {
@@ -80,7 +98,7 @@ st.markdown("""
             max-width: 100vw !important;
         }
 
-        /* 5. Căn kích thước Viewport cho iframe chứa bản đồ */
+        /* 6. Căn kích thước Viewport cho iframe chứa bản đồ */
         [data-testid="element-container"], .stCustomComponentV1, iframe {
             width: 100vw !important;
             height: calc(100vh + 80px) !important;
@@ -90,7 +108,7 @@ st.markdown("""
             display: block !important;
         }
 
-        /* 6. Sidebar nổi đè lên trên bản đồ */
+        /* 7. Sidebar nổi đè lên trên bản đồ */
         section[data-testid="stSidebar"] {
             z-index: 999999 !important;
         }
@@ -131,9 +149,10 @@ def load_server_data():
 
 df, file_name = load_server_data()
 
-# GIAO DIỆN SIDEBAR (MENU)
-# Đưa dòng "Make by BangNC13" lên trên cùng bên trái
-st.sidebar.caption("Make by BangNC13")
+# Giao diện Sidebar
+# Badge Make by BangNC13 ở trên cùng bên trái
+st.sidebar.markdown('<div class="author-badge">Make by BangNC13</div>', unsafe_allow_html=True)
+
 st.sidebar.markdown("### ⚡ TQG-XÁC ĐỊNH VỊ TRÍ ĐỨT CÁP")
 st.sidebar.caption("Fiber Optic Break Location Finder - FPT Telecom System")
 st.sidebar.markdown("---")
@@ -273,7 +292,7 @@ if df is not None:
         map_center = [first_coord[0], first_coord[1]]
         zoom_lvl = 15
 
-    # Tắt nút zoom mặc định góc trên
+    # Đặt zoom_control=False để ẩn nút điều khiển mặc định phía trên
     m = folium.Map(location=map_center, zoom_start=zoom_lvl, tiles=None, zoom_control=False)
 
     # Chuyển cụm phím Zoom (+ / -) xuống góc dưới bên phải
