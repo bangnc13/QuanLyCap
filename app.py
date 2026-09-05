@@ -13,7 +13,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 2. CSS Tùy chỉnh: TRÀN SÁT MÉP TRÊN + NÚT MENU TRONG SUỐT 50%
+# 2. CSS Tùy chỉnh
 st.markdown("""
     <style>
         /* 1. Reset nền và ẩn cuộn trang */
@@ -31,29 +31,42 @@ st.markdown("""
             z-index: 999999 !important;
         }
 
-        /* 3. NÚT CHUYỂN MENU (MỞ/ẨN SIDEBAR) VỚI ĐỘ TRONG SUỐT 50% */
-        [data-testid="stSidebarCollapseButton"], 
+        /* 3. THIẾT LẬP NÚT CHUYỂN ĐỔI MENU (MỞ / ẨN SIDEBAR) */
+        
+        /* Khi Sidebar đang MỞ (Mặc định nút thu gọn nằm trong Header) */
+        [data-testid="stSidebarCollapseButton"] {
+            z-index: 1000000 !important;
+            background-color: rgba(255, 255, 255, 0.3) !important; /* Màu trắng độ trong suốt 30% */
+            color: #000000 !important;
+            border-radius: 50% !important;
+            border: 1px solid rgba(0, 0, 0, 0.1) !important;
+            box-shadow: 0px 2px 6px rgba(0, 0, 0, 0.2) !important;
+            padding: 4px !important;
+            backdrop-filter: blur(3px) !important;
+            transition: all 0.3s ease !important;
+        }
+
+        /* Khi Sidebar BỊ ẨN (Nút mở lại menu hiển thị ngoài màn hình Full Map) */
         [data-testid="collapsedControl"] {
             z-index: 1000000 !important;
             position: fixed !important;
             top: 12px !important;
             left: 12px !important;
-            /* Màu nền FPT Brand với độ trong suốt 50% (alpha = 0.5) */
-            background: rgba(243, 111, 33, 0.5) !important; 
-            color: #ffffff !important;
+            background-color: rgba(255, 255, 255, 0.7) !important; /* Màu trắng độ trong suốt 70% */
+            color: #000000 !important;
             border-radius: 50% !important;
-            border: 1px solid rgba(255, 255, 255, 0.6) !important;
+            border: 1px solid rgba(0, 0, 0, 0.2) !important;
             box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3) !important;
             padding: 6px !important;
-            backdrop-filter: blur(4px) !important; /* Làm mờ nhẹ nền đằng sau nút */
+            backdrop-filter: blur(4px) !important;
             transition: all 0.3s ease !important;
         }
 
-        /* Hiệu ứng khi rê chuột vào nút Menu */
+        /* Hiệu ứng Rê chuột (Hover) */
         [data-testid="stSidebarCollapseButton"]:hover, 
         [data-testid="collapsedControl"]:hover {
-            background: rgba(243, 111, 33, 0.85) !important;
-            transform: scale(1.1);
+            background-color: rgba(255, 255, 255, 0.95) !important;
+            transform: scale(1.08);
         }
 
         /* 4. ĐẨY BẢN ĐỒ TRÀN SÁT CẠNH TRÊN TUYỆT ĐỐI */
@@ -62,7 +75,7 @@ st.markdown("""
         [data-testid="stVerticalBlock"] {
             padding: 0 !important;
             margin: 0 !important;
-            margin-top: -80px !important; /* Đẩy nội dung đè lên hết khoảng trống Header */
+            margin-top: -80px !important;
             gap: 0rem !important;
             max-width: 100vw !important;
         }
@@ -118,14 +131,14 @@ def load_server_data():
 
 df, file_name = load_server_data()
 
-# Giao diện Sidebar
+# GIAO DIỆN SIDEBAR (MENU)
+# Đưa dòng "Make by BangNC13" lên trên cùng bên trái
+st.sidebar.caption("Make by BangNC13")
 st.sidebar.markdown("### ⚡ TQG-XÁC ĐỊNH VỊ TRÍ ĐỨT CÁP")
 st.sidebar.caption("Fiber Optic Break Location Finder - FPT Telecom System")
 st.sidebar.markdown("---")
 
 if df is not None:
-    st.sidebar.success(" Make by BangNC13")
-    
     df.columns = [str(col).strip() for col in df.columns]
     
     lat_col1 = next((c for c in df.columns if 'lat' in c.lower() and '1' in c.lower()), None)
@@ -260,7 +273,7 @@ if df is not None:
         map_center = [first_coord[0], first_coord[1]]
         zoom_lvl = 15
 
-    # Đặt zoom_control=False để ẩn nút điều khiển mặc định phía trên
+    # Tắt nút zoom mặc định góc trên
     m = folium.Map(location=map_center, zoom_start=zoom_lvl, tiles=None, zoom_control=False)
 
     # Chuyển cụm phím Zoom (+ / -) xuống góc dưới bên phải
