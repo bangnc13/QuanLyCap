@@ -105,7 +105,7 @@ def load_server_data():
 df, file_name = load_server_data() 
 
 st.sidebar.markdown('<div class="sidebar-title">⚡ TQG-XÁC ĐỊNH VỊ TRÍ ĐỨT CÁP</div>', unsafe_allow_html=True)
-st.sidebar.markdown('<div class="sidebar-subtitle"></div>', unsafe_allow_html=True)
+st.sidebar.markdown('<div class="sidebar-subtitle">Fiber Optic Break Location Finder - FPT Telecom System</div>', unsafe_allow_html=True)
 
 if df is not None: 
     st.sidebar.success("🐒 Make by BangNC13") 
@@ -235,9 +235,9 @@ if df is not None:
           
         if st.session_state.break_gps: 
             gps = st.session_state.break_gps 
-            gmap_url = f"https://www.google.com/maps?q={gps[0]},{gps[1]}" 
+            gmap_url = f"https://www.google.com/maps/dir/?api=1&destination={gps[0]},{gps[1]}" 
             st.sidebar.markdown(f"📍 **GPS:** `{gps[0]:.6f}, {gps[1]:.6f}`") 
-            st.sidebar.link_button("📍 Mở trên Google Maps", gmap_url, type="primary", use_container_width=True)
+            st.sidebar.link_button("🚗 Dẫn đường qua Google Maps App", gmap_url, type="primary", use_container_width=True)
 
     # 2. Chuẩn bị Dữ liệu Render Bản đồ Leaflet JS
     map_center = [21.0285, 105.8542] 
@@ -280,7 +280,7 @@ if df is not None:
         if st.session_state.break_gps: 
             res = st.session_state.break_result
             gps = st.session_state.break_gps
-            gmap_url = f"https://www.google.com/maps?q={gps[0]},{gps[1]}"
+            gmap_url = f"https://www.google.com/maps/dir/?api=1&destination={gps[0]},{gps[1]}"
             
             popup_html = f"""
             <div style="font-family: Arial, sans-serif; min-width: 180px;">
@@ -301,7 +301,7 @@ if df is not None:
                     text-decoration: none;
                     font-weight: bold;
                     font-size: 11px;
-                ">📍 Mở trên Google Maps</a>
+                ">🚗 Mở dẫn đường trên App Google Maps</a>
             </div>
             """
             
@@ -331,15 +331,22 @@ if df is not None:
                 "radius": 4
             })
 
-    # Leaflet HTML - Tích hợp Google Maps Tile + Định vị GPS Điện thoại
+    # Leaflet HTML - Tích hợp Tile Google, Định vị GPS và Routing Chỉ Đường
     leaflet_html = f"""
     <!DOCTYPE html>
     <html>
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
+        <!-- Leaflet CSS & JS -->
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+        <!-- Leaflet Routing Machine CSS & JS -->
+        <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+        <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+
         <style>
             html, body {{
                 width: 100%;
@@ -369,7 +376,6 @@ if df is not None:
                 70% {{ transform: scale(1.2); box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); }}
                 100% {{ transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }}
             }}
-            /* CSS cho vị trí điện thoại người dùng */
             .user-location-marker {{
                 background-color: #2563EB;
                 border: 3px solid #FFFFFF;
@@ -380,26 +386,27 @@ if df is not None:
                 margin-top: -9px !important;
                 box-shadow: 0 0 8px rgba(37, 99, 235, 0.8);
             }}
-            /* Nút định vị GPS custom */
-            .leaflet-control-locate {{
+            .leaflet-control-btn {{
                 background-color: #ffffff;
                 border: 2px solid rgba(0,0,0,0.2);
                 border-radius: 4px;
-                width: 34px;
-                height: 34px;
-                line-height: 30px;
-                text-align: center;
+                padding: 4px 8px;
                 cursor: pointer;
-                font-size: 18px;
+                font-size: 14px;
+                font-weight: bold;
                 box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+                display: flex;
+                align-items: center;
+                gap: 4px;
             }}
-            .leaflet-control-locate:hover {{
+            .leaflet-control-btn:hover {{
                 background-color: #f4f4f4;
             }}
-            .leaflet-control-layers {{
+            .leaflet-control-container .leaflet-routing-container {{
+                max-width: 280px;
                 font-family: Arial, sans-serif;
-                border-radius: 8px !important;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
+                font-size: 12px;
+                opacity: 0.9;
             }}
         </style>
     </head>
@@ -467,13 +474,13 @@ if df is not None:
                     if (breakMarkerData.tooltip) bMarker.bindTooltip(breakMarkerData.tooltip);
                 }}
 
-                // -------------------------------------------------------------
-                // 8. TÍNH NĂNG ĐỊNH VỊ GPS ĐIỆN THOẠI / THIẾT BỊ NGƯỜI DÙNG
-                // -------------------------------------------------------------
+                // 8. Định vị GPS người dùng
+                var userLatLng = null;
                 var userMarker = null;
                 var accuracyCircle = null;
 
                 function onLocationFound(e) {{
+                    userLatLng = e.latlng;
                     var radius = e.accuracy / 2;
 
                     if (userMarker) {{
@@ -482,7 +489,7 @@ if df is not None:
                     }} else {{
                         var userIcon = L.divIcon({{ className: 'user-location-marker' }});
                         userMarker = L.marker(e.latlng, {{ icon: userIcon }}).addTo(map)
-                            .bindPopup("<b>Vị trí hiện tại của bạn</b>").openPopup();
+                            .bindPopup("<b>Vị trí hiện tại của bạn</b>");
                         accuracyCircle = L.circle(e.latlng, radius, {{
                             color: '#2563EB',
                             fillColor: '#3B82F6',
@@ -493,29 +500,85 @@ if df is not None:
                 }}
 
                 function onLocationError(e) {{
-                    alert("Không thể lấy vị trí hiện tại: " + e.message + "\\nVui lòng bật GPS/Chia sẻ vị trí trên trình duyệt điện thoại.");
+                    console.log("Không thể truy cập GPS: " + e.message);
                 }}
 
                 map.on('locationfound', onLocationFound);
                 map.on('locationerror', onLocationError);
-
-                // Tự động định vị vị trí lần đầu (Không tự động pan camera nếu đang xem vị trí đứt cáp)
                 map.locate({{ watch: true, setView: false, enableHighAccuracy: true }});
 
-                // Nút bấm Custom để bay tới vị trí người dùng
-                var locateControl = L.Control.extend({{
+                // 9. Tính năng Chỉ đường Routing từ GPS đến Điểm Đứt cáp
+                var routingControl = null;
+
+                function drawRouteToDestination() {{
+                    if (!userLatLng) {{
+                        alert("Chưa xác định được vị trí GPS hiện tại của bạn. Vui lòng cho phép quyền truy cập vị trí trên trình duyệt.");
+                        return;
+                    }}
+
+                    var destLatLng = null;
+                    if (breakMarkerData) {{
+                        destLatLng = L.latLng(breakMarkerData.coords[0], breakMarkerData.coords[1]);
+                    }} else if (markersData.length > 0) {{
+                        destLatLng = L.latLng(markersData[0].coords[0], markersData[0].coords[1]);
+                    }}
+
+                    if (!destLatLng) {{
+                        alert("Chưa chọn vị trí đứt cáp hoặc điểm kết nối nào để chỉ đường!");
+                        return;
+                    }}
+
+                    if (routingControl) {{
+                        map.removeControl(routingControl);
+                    }}
+
+                    routingControl = L.Routing.control({{
+                        waypoints: [
+                            userLatLng,
+                            destLatLng
+                        ],
+                        routeWhileDragging: false,
+                        addWaypoints: false,
+                        show: true,
+                        lineOptions: {{
+                            styles: [{{ color: '#059669', opacity: 0.8, weight: 6 }}]
+                        }}
+                    }}).addTo(map);
+                }}
+
+                // 10. Tạo bảng điều khiển Nút Bấm trên Bản đồ (Góc trên bên trái)
+                var CustomControls = L.Control.extend({{
                     options: {{ position: 'topleft' }},
                     onAdd: function (map) {{
-                        var container = L.DomUtil.create('div', 'leaflet-control-locate');
-                        container.innerHTML = '🎯';
-                        container.title = "Định vị vị trí của tôi";
-                        container.onclick = function() {{
-                            map.locate({{ setView: true, maxZoom: 18, enableHighAccuracy: true }});
+                        var container = L.DomUtil.create('div', 'leaflet-bar');
+                        container.style.display = 'flex';
+                        container.style.flexDirection = 'column';
+                        container.style.gap = '5px';
+
+                        // Nút định vị GPS
+                        var btnLocate = L.DomUtil.create('div', 'leaflet-control-btn', container);
+                        btnLocate.innerHTML = '🎯 GPS của tôi';
+                        btnLocate.onclick = function() {{
+                            if (userLatLng) {{
+                                map.setView(userLatLng, 18);
+                            }} else {{
+                                map.locate({{ setView: true, maxZoom: 18, enableHighAccuracy: true }});
+                            }}
                         }};
+
+                        // Nút chỉ đường
+                        var btnRoute = L.DomUtil.create('div', 'leaflet-control-btn', container);
+                        btnRoute.innerHTML = '🚗 Chỉ đường tới điểm sự cố';
+                        btnRoute.style.backgroundColor = '#10B981';
+                        btnRoute.style.color = '#FFFFFF';
+                        btnRoute.onclick = function() {{
+                            drawRouteToDestination();
+                        }};
+
                         return container;
                     }}
                 }});
-                map.addControl(new locateControl());
+                map.addControl(new CustomControls());
 
                 setTimeout(function() {{
                     map.invalidateSize();
