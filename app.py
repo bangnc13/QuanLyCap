@@ -53,7 +53,7 @@ st.markdown("""
             max-width: 100vw !important;
         }
 
-        /* 5. Căn bản đồ tràn 100% màn hình tự nhiên */
+        /* 5. Căn bản đồ tràn 100% màn hình tự nhiên mà không che phủ nút hệ thống */
         [data-testid="element-container"], .stCustomComponentV1, iframe {
             width: 100vw !important;
             height: 100vh !important;
@@ -246,22 +246,7 @@ if df is not None:
         map_center = [first_coord[0], first_coord[1]]
         zoom_lvl = 15
 
-    # Đặt zoom_control=False để ẩn nút zoom mặc định ở góc trên
-    m = folium.Map(location=map_center, zoom_start=zoom_lvl, tiles=None, zoom_control=False)
-
-    # Thêm nút zoom vào góc dưới bên phải
-    folium.plugins.FloatWithClick().add_to(m) if hasattr(folium.plugins, 'FloatWithClick') else None
-    
-    # Tạo nút Zoom ở góc dưới bên phải bằng JavaScript/Macro của Folium
-    macro = folium.MacroElement()
-    macro._template = folium.branca.element.Template("""
-        {% macro script(this, kwargs) %}
-            L.control.zoom({
-                position: 'bottomright'
-            }).addTo({{this._parent.get_name()}});
-        {% endmacro %}
-    """)
-    m.add_child(macro)
+    m = folium.Map(location=map_center, zoom_start=zoom_lvl, tiles=None)
 
     folium.TileLayer(
         tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
