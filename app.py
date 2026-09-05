@@ -13,26 +13,25 @@ st.set_page_config(
     initial_sidebar_state="expanded" 
 ) 
  
-# 2. CSS Tùy chỉnh TRÀN MÀN HÌNH CHUẨN (KHÔNG BỊ ĐẨY KHUNG HÌNH)
+# 2. CSS Tùy chỉnh TRÀN MÀN HÌNH CHUẨN
 st.markdown(""" 
     <style> 
-        /* 1. Xóa cuộn trang và ép toàn bộ giao diện đúng 100vh */ 
+        /* Xóa cuộn trang chính */ 
         html, body, [data-testid="stAppViewContainer"], .main, .stApp { 
             margin: 0 !important; 
             padding: 0 !important; 
             height: 100vh !important; 
-            max-height: 100vh !important;
             overflow: hidden !important; 
         } 
  
-        /* 2. Triệt tiêu nền Header */ 
+        /* Triệt tiêu nền Header */ 
         header[data-testid="stHeader"] { 
             background: transparent !important; 
             height: 0px !important; 
             z-index: 999999 !important; 
         } 
  
-        /* 3. Đưa nút Sidebar lên trên cùng */ 
+        /* Đưa nút Sidebar lên ưu tiên cao nhất */ 
         [data-testid="stSidebarCollapseButton"],  
         [data-testid="collapsedControl"] { 
             z-index: 1000000 !important; 
@@ -45,7 +44,7 @@ st.markdown("""
             padding: 4px !important; 
         } 
  
-        /* 4. Xóa margin/padding khung chứa chính */ 
+        /* Xóa padding container chính */ 
         .main .block-container,  
         [data-testid="stMainBlockContainer"], 
         [data-testid="stVerticalBlock"] { 
@@ -56,18 +55,16 @@ st.markdown("""
             height: 100vh !important;
         } 
  
-        /* 5. Ép iframe Bản đồ chỉ cao vừa đúng 100% màn hình hiển thị (100vh) */ 
+        /* Ép iframe Bản đồ phủ full màn hình hiển thị */ 
         [data-testid="element-container"], .stCustomComponentV1, iframe { 
             width: 100vw !important; 
             height: 100vh !important; 
-            max-height: 100vh !important;
             border: none !important; 
             margin: 0 !important; 
             padding: 0 !important; 
             display: block !important; 
         } 
  
-        /* 6. Sidebar nổi phía trên */ 
         section[data-testid="stSidebar"] { 
             z-index: 999999 !important; 
         } 
@@ -328,13 +325,13 @@ if df is not None:
                 fill_color="white" 
             ).add_to(m) 
  
-    # Hiển thị bản đồ chính xác giữa màn hình
+    # Đặt chiều cao số cố định cho st_folium để render iframe ổn định,
+    # CSS phía trên sẽ chịu trách nhiệm giãn iframe ra toàn màn hình hiển thị.
     st_folium(
         m, 
         use_container_width=True, 
-        height=None,             # Đặt chiều cao bằng None để CSS 100vh kiểm soát hoàn toàn
-        key="folium_map",
-        returned_objects=[]      # Ngăn Streamlit ghi nhận tương tác cuộn làm trôi góc nhìn tâm
+        height=800, 
+        key=f"folium_map_{st.session_state.break_gps}"
     ) 
  
 else: 
