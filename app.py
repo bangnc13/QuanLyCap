@@ -6,7 +6,26 @@ import folium
 from streamlit_folium import st_folium 
  
 # 1. Cấu hình trang Streamlit 
-st.set_page_config(page_title="Xác Định Vị Trí Đứt Cáp Make by BangNC13", layout="wide", initial_sidebar_state="expanded") 
+st.set_page_config(
+    page_title="Xác Định Vị Trí ĐỨT CÁP - FPT Telecom", 
+    layout="wide", 
+    initial_sidebar_state="expanded"
+) 
+
+# CSS tùy chỉnh để làm tràn viền bản đồ, loại bỏ khoảng trắng thừa ở trên cùng
+st.markdown("""
+    <style>
+        .block-container {
+            padding-top: 1rem;
+            padding-bottom: 0rem;
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+        iframe {
+            width: 100% !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
  
 # Khởi tạo session state lưu kết quả 
 if "break_result" not in st.session_state: 
@@ -17,7 +36,6 @@ if "break_gps" not in st.session_state:
 # Hàm tự động tìm và đọc file Excel có sẵn trên Server 
 @st.cache_data 
 def load_server_data(): 
-    # Tìm các tên file Excel mặc định trên thư mục Server 
     possible_files = [ 
         "Danh-Sách-Đoạn-Cáp.xlsx",  
         "Danh_Sach_Doan_Cap.xlsx",  
@@ -31,7 +49,6 @@ def load_server_data():
             selected_file = f 
             break 
  
-    # Nếu không tìm thấy các tên cố định, quét lấy file .xlsx đầu tiên 
     if not selected_file: 
         files = [f for f in os.listdir(".") if f.endswith(".xlsx") or f.endswith(".xls")] 
         if files: 
@@ -41,15 +58,17 @@ def load_server_data():
         df = pd.read_excel(selected_file) 
         return df, selected_file 
     return None, None 
- 
-st.title("⚡ TQG-XÁC ĐỊNH VỊ TRÍ ĐỨT CÁP ") 
-st.caption("Fiber Optic Break Location Finder - FPT Telecom System") 
- 
+
 # 2. Tải Dữ Liệu Từ Server 
 df, file_name = load_server_data() 
+
+# ĐẶT TIÊU ĐỀ Ở TÊN CÙNG BÊN TRÁI (Trên đầu Sidebar)
+st.sidebar.markdown("### ⚡ TQG-XÁC ĐỊNH VỊ TRÍ ĐỨT CÁP")
+st.sidebar.caption("Fiber Optic Break Location Finder - FPT Telecom System")
+st.sidebar.markdown("---")
  
 if df is not None: 
-    st.sidebar.success(f"🐒 Make by BangNC13") 
+    st.sidebar.success("🐒 Make by BangNC13") 
      
     df.columns = [str(col).strip() for col in df.columns] 
      
@@ -164,7 +183,7 @@ if df is not None:
             st.session_state.break_result = b_res 
             st.session_state.break_gps = b_gps 
  
-    # Display Báo lỗi / Vị trí đứt ở Sidebar 
+    # Hiển thị Báo lỗi / Vị trí đứt ở Sidebar 
     if st.session_state.break_result: 
         res = st.session_state.break_result 
         st.sidebar.error("📍 VỊ TRÍ ĐỨT CÁP DỰ KIẾN") 
@@ -178,7 +197,7 @@ if df is not None:
             st.sidebar.markdown(f"📍 **GPS:** `{gps[0]:.6f}, {gps[1]:.6f}`") 
             st.sidebar.markdown(f"👉 [**Mở trên Google Maps**]({gmap_url})") 
 
-    # 3. Hiển thị Bản đồ Leaflet (Chỉ dùng Google Maps)
+    # 3. Hiển thị Bản đồ Leaflet Full Màn Hình (Chỉ dùng Google Maps)
     map_center = [21.0285, 105.8542] 
     zoom_lvl = 12 
  
@@ -190,7 +209,6 @@ if df is not None:
         map_center = [first_coord[0], first_coord[1]] 
         zoom_lvl = 15 
 
-    # Khởi tạo bản đồ
     m = folium.Map(location=map_center, zoom_start=zoom_lvl, tiles=None) 
 
     # Lớp 1: Google Maps Giao thông (Đường bộ)
@@ -202,7 +220,7 @@ if df is not None:
         control=True
     ).add_to(m)
 
-    # Lớp 2: Google Maps Vệ tinh (Hybrid - Có tên đường)
+    # Lớp 2: Google Maps Vệ tinh (Hybrid)
     folium.TileLayer(
         tiles="https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
         attr="Google Maps Satellite",
@@ -211,7 +229,6 @@ if df is not None:
         control=True
     ).add_to(m)
 
-    # Công cụ chọn lớp bản đồ ở góc trên bên phải
     folium.LayerControl(position="topright").add_to(m)
 
     # Nếu ĐÃ TÍNH ĐƯỢC VỊ TRÍ ĐỨT -> Chỉ vẽ tuyến bị đứt 
@@ -270,7 +287,8 @@ if df is not None:
                 fill_color="white" 
             ).add_to(m) 
 
-    st_folium(m, width=1100, height=650, key="folium_map") 
+    # Đặt height cố định tầm 780px để mở rộng màn hình map tối đa
+    st_folium(m, use_container_width=True, height=780, key="folium_map") 
 
 else: 
     st.error("❌ Không tìm thấy file Excel trên Server. Vui lòng kiểm tra lại tên file `Danh-Sách-Đoạn-Cáp.xlsx` trong thư mục chạy mã.")
