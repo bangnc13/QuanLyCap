@@ -4,57 +4,35 @@ import pandas as pd
 import networkx as nx 
 import folium 
 from streamlit_folium import st_folium 
-
-# 1. Cấu hình trang Streamlit & Thiết lập Giao diện Dark Theme
+ 
+# 1. Cấu hình trang Streamlit 
 st.set_page_config(
     page_title="Xác Định Vị Trí ĐỨT CÁP - FPT Telecom", 
     layout="wide", 
     initial_sidebar_state="expanded"
 ) 
 
-# Inject Custom CSS cho Dark Theme và Tràn Viền Bản Đồ
+# CSS tùy chỉnh để làm tràn viền bản đồ, loại bỏ khoảng trắng thừa ở trên cùng
 st.markdown("""
     <style>
-        /* Dark mode nền chính và chữ */
-        .stApp {
-            background-color: #121212;
-            color: #E0E0E0;
-        }
-        
-        /* Cấu hình lề mỏng để tối ưu diện tích bản đồ */
         .block-container {
-            padding-top: 0.5rem !important;
-            padding-bottom: 0rem !important;
-            padding-left: 0.5rem !important;
-            padding-right: 0.5rem !important;
+            padding-top: 1rem;
+            padding-bottom: 0rem;
+            padding-left: 1rem;
+            padding-right: 1rem;
         }
-        
-        /* Tuỳ chỉnh khung iframe chứa bản đồ */
         iframe {
             width: 100% !important;
-            border-radius: 8px;
-            border: 1px solid #333333;
-        }
-        
-        /* Tùy chỉnh Sidebar Dark Theme */
-        section[data-testid="stSidebar"] {
-            background-color: #1E1E1E;
-            border-right: 1px solid #2D2D2D;
-        }
-        
-        /* Đổi màu điểm nhấn chữ / tiêu đề theo chuẩn FPT Orange */
-        h1, h2, h3, .stMarkdown strong {
-            color: #FF6600 !important;
         }
     </style>
 """, unsafe_allow_html=True)
-
+ 
 # Khởi tạo session state lưu kết quả 
 if "break_result" not in st.session_state: 
     st.session_state.break_result = None 
 if "break_gps" not in st.session_state: 
     st.session_state.break_gps = None 
-
+ 
 # Hàm tự động tìm và đọc file Excel có sẵn trên Server 
 @st.cache_data 
 def load_server_data(): 
@@ -70,12 +48,12 @@ def load_server_data():
         if os.path.exists(f): 
             selected_file = f 
             break 
-
+ 
     if not selected_file: 
         files = [f for f in os.listdir(".") if f.endswith(".xlsx") or f.endswith(".xls")] 
         if files: 
             selected_file = files[0] 
-
+ 
     if selected_file: 
         df = pd.read_excel(selected_file) 
         return df, selected_file 
@@ -84,19 +62,13 @@ def load_server_data():
 # 2. Tải Dữ Liệu Từ Server 
 df, file_name = load_server_data() 
 
-# THANH BÊN (SIDEBAR)
-st.sidebar.markdown("### ⚡ TQG - XÁC ĐỊNH VỊ TRÍ ĐỨT CÁP")
+# ĐẶT TIÊU ĐỀ Ở TÊN CÙNG BÊN TRÁI (Trên đầu Sidebar)
+st.sidebar.markdown("### ⚡ TQG-XÁC ĐỊNH VỊ TRÍ ĐỨT CÁP")
 st.sidebar.caption("Fiber Optic Break Location Finder - FPT Telecom System")
-
-# Toggle Bật/Tắt Chế độ Khách (Guest Mode)
-guest_mode = st.sidebar.toggle("👁️ Chế độ Khách (Ẩn thông tin nội bộ)", value=False)
 st.sidebar.markdown("---")
-
+ 
 if df is not None: 
-    # Nếu không phải Chế độ Khách -> Hiển thị người thực hiện và tên File
-    if not guest_mode:
-        st.sidebar.success("🐒 Make by BangNC13")
-        st.sidebar.info(f"📂 **File:** `{file_name}`")
+    st.sidebar.success("🐒 Make by BangNC13") 
      
     df.columns = [str(col).strip() for col in df.columns] 
      
@@ -105,11 +77,11 @@ if df is not None:
     lon_col1 = next((c for c in df.columns if 'lng' in c.lower() or ('lon' in c.lower() and '1' in c.lower())), None) 
     lat_col2 = next((c for c in df.columns if 'lat' in c.lower() and '2' in c.lower()), None) 
     lon_col2 = next((c for c in df.columns if 'lng' in c.lower() or ('lon' in c.lower() and '2' in c.lower())), None) 
-
+ 
     if not lat_col1: 
         lat_col1 = next((c for c in df.columns if 'lat' in c.lower() or 'vĩ độ' in c.lower()), None) 
         lon_col1 = next((c for c in df.columns if 'lng' in c.lower() or 'lon' in c.lower() or 'kinh độ' in c.lower()), None) 
-
+ 
     # Lọc tuyến cáp theo POP 
     if 'Tên đoạn cáp' in df.columns: 
         df['POP'] = df['Tên đoạn cáp'].apply(lambda x: str(x).split('.')[0] if '.' in str(x) else str(x)) 
@@ -118,11 +90,11 @@ if df is not None:
         pop_df = df[df['POP'] == selected_pop].copy() 
     else: 
         pop_df = df.copy() 
-
+ 
     # Dựng đồ thị kết nối & Lưu tọa độ các Node 
     G = nx.Graph() 
     node_coords = {} 
-
+ 
     for _, row in pop_df.iterrows(): 
         k1 = str(row.get('Điểm KN1', '')).strip() 
         k2 = str(row.get('Điểm KN2', '')).strip() 
@@ -138,10 +110,10 @@ if df is not None:
                 node_coords[k2] = (float(row[lat_col2]), float(row[lon_col2])) 
         except Exception: 
             pass 
-
+ 
         if k1 and k2: 
             G.add_edge(k1, k2, cable=cable, length=length) 
-
+ 
     st.sidebar.markdown("---") 
     st.sidebar.subheader("📍 THÔNG TIN ĐO (OTDR)") 
      
@@ -151,34 +123,34 @@ if df is not None:
         neighbors = list(G.neighbors(start_node)) if start_node in G else [] 
         direction_node = st.sidebar.selectbox("Hướng đo (Xuôi ngọn / Về ODF)", neighbors, key="direction_node") 
         measured_len = st.sidebar.number_input("Chiều dài đo được (Mét)", min_value=0.0, value=170.0, step=10.0, key="measured_len") 
-
+ 
         col_btn1, col_btn2 = st.sidebar.columns(2) 
         with col_btn1: 
             btn_calc = st.button("🎯 Xác định", type="primary", use_container_width=True) 
         with col_btn2: 
             btn_reset = st.button("🔄 Xóa", use_container_width=True) 
-
+ 
         if btn_reset: 
             st.session_state.break_result = None 
             st.session_state.break_gps = None 
             st.rerun() 
-
+ 
         # Tính toán điểm đứt 
         if btn_calc and start_node and direction_node: 
             current = start_node 
             nxt = direction_node 
             accumulated = 0.0 
             visited = {current} 
-
+ 
             b_res = None 
             b_gps = None 
-
+ 
             while True: 
                 edge_data = G[current][nxt] 
                 seg_len = edge_data['length'] 
                 cable_id = edge_data['cable'] 
                 visited.add(nxt) 
-
+ 
                 if accumulated + seg_len >= measured_len: 
                     d1 = measured_len - accumulated 
                     d2 = seg_len - d1 
@@ -191,7 +163,7 @@ if df is not None:
                         "seg_len": seg_len, 
                         "total": measured_len 
                     } 
-
+ 
                     if current in node_coords and nxt in node_coords and seg_len > 0: 
                         lat1, lon1 = node_coords[current] 
                         lat2, lon2 = node_coords[nxt] 
@@ -207,10 +179,10 @@ if df is not None:
                         break 
                     current = nxt 
                     nxt = next_nodes[0] 
-
+ 
             st.session_state.break_result = b_res 
             st.session_state.break_gps = b_gps 
-
+ 
     # Hiển thị Báo lỗi / Vị trí đứt ở Sidebar 
     if st.session_state.break_result: 
         res = st.session_state.break_result 
@@ -219,17 +191,16 @@ if df is not None:
         st.sidebar.markdown(f"• Cách **{res['from']}**: `{res['d1']:.1f}m` / {res['seg_len']}m") 
         st.sidebar.markdown(f"• Cách **{res['to']}**: `{res['d2']:.1f}m`") 
          
-        # Chỉ hiển thị GPS và liên kết Google Maps khi KHÔNG PHẢI chế độ Khách
-        if st.session_state.break_gps and not guest_mode: 
+        if st.session_state.break_gps: 
             gps = st.session_state.break_gps 
             gmap_url = f"https://www.google.com/maps?q={gps[0]},{gps[1]}" 
             st.sidebar.markdown(f"📍 **GPS:** `{gps[0]:.6f}, {gps[1]:.6f}`") 
             st.sidebar.markdown(f"👉 [**Mở trên Google Maps**]({gmap_url})") 
 
-    # 3. Hiển thị Bản đồ Leaflet Full Màn Hình (Tối ưu Dark Tiles)
+    # 3. Hiển thị Bản đồ Leaflet Full Màn Hình (Chỉ dùng Google Maps)
     map_center = [21.0285, 105.8542] 
     zoom_lvl = 12 
-
+ 
     if st.session_state.break_gps: 
         map_center = st.session_state.break_gps 
         zoom_lvl = 17 
@@ -240,11 +211,11 @@ if df is not None:
 
     m = folium.Map(location=map_center, zoom_start=zoom_lvl, tiles=None) 
 
-    # Lớp 1: Google Maps Dark Mode (Sử dụng CartoDB Dark Matter)
+    # Lớp 1: Google Maps Giao thông (Đường bộ)
     folium.TileLayer(
-        tiles="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-        attr="&copy; OpenStreetMap &copy; CARTO",
-        name="Giao diện Tối (Dark Theme)",
+        tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
+        attr="Google Maps",
+        name="Google Maps (Giao thông)",
         overlay=False,
         control=True
     ).add_to(m)
@@ -268,7 +239,7 @@ if df is not None:
         if u in node_coords and v in node_coords: 
             folium.PolyLine( 
                 locations=[node_coords[u], node_coords[v]], 
-                color="#FF3333", 
+                color="red", 
                 weight=6, 
                 opacity=0.9, 
                 tooltip=f"Sự cố đoạn: {st.session_state.break_result['cable']}" 
@@ -280,9 +251,9 @@ if df is not None:
                     radius=7, 
                     popup=f"Điểm KN: {node}", 
                     tooltip=f"Điểm KN: {node}", 
-                    color="#FF6600", 
+                    color="blue", 
                     fill=True, 
-                    fill_color="#FFFFFF" 
+                    fill_color="white" 
                 ).add_to(m) 
 
         if st.session_state.break_gps: 
@@ -299,9 +270,9 @@ if df is not None:
             if u in node_coords and v in node_coords: 
                 folium.PolyLine( 
                     locations=[node_coords[u], node_coords[v]], 
-                    color="#FF6600", 
+                    color="#2b5c8f", 
                     weight=3, 
-                    opacity=0.7, 
+                    opacity=0.6, 
                     tooltip=f"Cáp: {data.get('cable', '')}" 
                 ).add_to(m) 
 
@@ -311,13 +282,13 @@ if df is not None:
                 radius=4, 
                 popup=f"Điểm KN: {node_id}", 
                 tooltip=node_id, 
-                color="#FF6600", 
+                color="#2b5c8f", 
                 fill=True, 
-                fill_color="#121212" 
+                fill_color="white" 
             ).add_to(m) 
 
-    # Tối đa chiều cao khung bản đồ (850px)
-    st_folium(m, use_container_width=True, height=850, key="folium_map") 
+    # Đặt height cố định tầm 780px để mở rộng màn hình map tối đa
+    st_folium(m, use_container_width=True, height=780, key="folium_map") 
 
 else: 
     st.error("❌ Không tìm thấy file Excel trên Server. Vui lòng kiểm tra lại tên file `Danh-Sách-Đoạn-Cáp.xlsx` trong thư mục chạy mã.")
