@@ -331,7 +331,7 @@ if df is not None:
                 "radius": 4
             })
 
-    # Leaflet HTML - Tích hợp Tile Google, Định vị GPS và Routing Chỉ Đường (Đã ẩn khung chỉ dẫn từng bước)
+    # Leaflet HTML (Đã di chuyển Zoom + Layer Map xuống cạnh dưới)
     leaflet_html = f"""
     <!DOCTYPE html>
     <html>
@@ -402,9 +402,13 @@ if df is not None:
             .leaflet-control-btn:hover {{
                 background-color: #f4f4f4;
             }}
-            /* ẨN HOÀN TOÀN KHUNG HƯỚNG DẪN TỪNG BƯỚC ĐỂ TIẾT KIỆM DIỆN TÍCH MÀN HÌNH DI ĐỘNG */
+            /* Ẩn hoàn toàn bảng hướng dẫn từng bước của Leaflet Routing */
             .leaflet-routing-container {{
                 display: none !important;
+            }}
+            /* Điều chỉnh lề dưới cho gọn trên di động */
+            .leaflet-bottom {{
+                margin-bottom: 10px;
             }}
         </style>
     </head>
@@ -424,21 +428,28 @@ if df is not None:
                     attribution: 'Google Maps Satellite'
                 }});
 
-                // 3. Khởi tạo Map
+                // 3. Khởi tạo Map (Tắt zoomControl mặc định góc trên để chủ động đặt dưới)
                 var map = L.map('map', {{
-                    zoomControl: true,
+                    zoomControl: false, // 👈 Tắt nút Zoom mặc định ở góc trên
                     attributionControl: false,
                     layers: [googleStreets]
                 }}).setView({json.dumps(map_center)}, {zoom_lvl});
 
-                // 4. Bảng chuyển lớp nền
-                var baseMaps = {{
-                    "🗺️ Google Đường phố": googleStreets,
-                    "🛰️ Google Vệ tinh": googleSat
-                }};
-                L.control.layers(baseMaps, null, {{ position: 'topright' }}).addTo(map);
+                // 4. Chuyển nút Zoom (+ / -) xuống CẠNH DƯỚI BÊN TRÁI
+                L.control.zoom({{
+                    position: 'bottomleft' // 👈 Chuyển xuống góc dưới bên trái
+                }}).addTo(map);
 
-                // 5. Vẽ tuyến cáp
+                // 5. Chuyển Bảng chuyển lớp nền (Layer Map) xuống CẠNH DƯỚI BÊN PHẢI
+                var baseMaps = {{
+                    "🗺️ Đường phố": googleStreets,
+                    "🛰️ Vệ tinh": googleSat
+                }};
+                L.control.layers(baseMaps, null, {{ 
+                    position: 'bottomright' // 👈 Chuyển xuống góc dưới bên phải
+                }}).addTo(map);
+
+                // 6. Vẽ tuyến cáp
                 var polylinesData = {json.dumps(polylines)};
                 polylinesData.forEach(function(item) {{
                     var line = L.polyline(item.coords, {{
@@ -449,7 +460,7 @@ if df is not None:
                     if (item.tooltip) line.bindTooltip(item.tooltip);
                 }});
 
-                // 6. Vẽ điểm kết nối (KN)
+                // 7. Vẽ điểm kết nối (KN)
                 var markersData = {json.dumps(markers)};
                 markersData.forEach(function(item) {{
                     var circle = L.circleMarker(item.coords, {{
@@ -463,7 +474,7 @@ if df is not None:
                     if (item.tooltip) circle.bindTooltip(item.tooltip);
                 }});
 
-                // 7. Vẽ điểm đứt cáp
+                // 8. Vẽ điểm đứt cáp
                 var breakMarkerData = {json.dumps(break_marker)};
                 if (breakMarkerData) {{
                     var breakIcon = L.divIcon({{ className: 'custom-break-icon' }});
@@ -472,7 +483,7 @@ if df is not None:
                     if (breakMarkerData.tooltip) bMarker.bindTooltip(breakMarkerData.tooltip);
                 }}
 
-                // 8. Định vị GPS người dùng
+                // 9. Định vị GPS người dùng
                 var userLatLng = null;
                 var userMarker = null;
                 var accuracyCircle = null;
@@ -505,7 +516,7 @@ if df is not None:
                 map.on('locationerror', onLocationError);
                 map.locate({{ watch: true, setView: false, enableHighAccuracy: true }});
 
-                // 9. Tính năng Chỉ đường Routing từ GPS đến Điểm Đứt cáp (Đã ẩn khung chỉ dẫn từng bước)
+                // 10. Tính năng Chỉ đường Routing từ GPS đến Điểm Đứt cáp
                 var routingControl = null;
 
                 function drawRouteToDestination() {{
@@ -537,14 +548,14 @@ if df is not None:
                         ],
                         routeWhileDragging: false,
                         addWaypoints: false,
-                        show: false, // Ẩn khung hiển thị hướng dẫn
+                        show: false,
                         lineOptions: {{
                             styles: [{{ color: '#059669', opacity: 0.8, weight: 6 }}]
                         }}
                     }}).addTo(map);
                 }}
 
-                // 10. Tạo bảng điều khiển Nút Bấm trên Bản đồ (Góc trên bên trái)
+                // 11. Tạo bảng điều khiển Nút Bấm GPS & Chỉ Đường (Góc trên bên trái)
                 var CustomControls = L.Control.extend({{
                     options: {{ position: 'topleft' }},
                     onAdd: function (map) {{
