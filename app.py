@@ -105,7 +105,7 @@ def load_server_data():
 df, file_name = load_server_data() 
 
 st.sidebar.markdown('<div class="sidebar-title">⚡ TQG-XÁC ĐỊNH VỊ TRÍ ĐỨT CÁP</div>', unsafe_allow_html=True)
-st.sidebar.markdown('<div class="sidebar-subtitle">Fiber Optic Break Location Finder - FPT Telecom System</div>', unsafe_allow_html=True)
+st.sidebar.markdown('<div class="sidebar-subtitle"></div>', unsafe_allow_html=True)
 
 if df is not None: 
     st.sidebar.success("🐒 Make by BangNC13") 
@@ -331,7 +331,7 @@ if df is not None:
                 "radius": 4
             })
 
-    # Leaflet HTML - Tải trực tiếp Google Maps Tile (Chống bị chặn Firewall/IP)
+    # Leaflet HTML - Tích hợp Google Maps Tile + Định vị GPS Điện thoại
     leaflet_html = f"""
     <!DOCTYPE html>
     <html>
@@ -369,6 +369,33 @@ if df is not None:
                 70% {{ transform: scale(1.2); box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); }}
                 100% {{ transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }}
             }}
+            /* CSS cho vị trí điện thoại người dùng */
+            .user-location-marker {{
+                background-color: #2563EB;
+                border: 3px solid #FFFFFF;
+                border-radius: 50%;
+                width: 18px !important;
+                height: 18px !important;
+                margin-left: -9px !important;
+                margin-top: -9px !important;
+                box-shadow: 0 0 8px rgba(37, 99, 235, 0.8);
+            }}
+            /* Nút định vị GPS custom */
+            .leaflet-control-locate {{
+                background-color: #ffffff;
+                border: 2px solid rgba(0,0,0,0.2);
+                border-radius: 4px;
+                width: 34px;
+                height: 34px;
+                line-height: 30px;
+                text-align: center;
+                cursor: pointer;
+                font-size: 18px;
+                box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+            }}
+            .leaflet-control-locate:hover {{
+                background-color: #f4f4f4;
+            }}
             .leaflet-control-layers {{
                 font-family: Arial, sans-serif;
                 border-radius: 8px !important;
@@ -380,13 +407,13 @@ if df is not None:
         <div id="map"></div>
         <script>
             document.addEventListener("DOMContentLoaded", function() {{
-                // 1. Khởi tạo Tile Google Đường phố
+                // 1. Tile Google Đường phố
                 var googleStreets = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={{x}}&y={{y}}&z={{z}}', {{
                     maxZoom: 20,
                     attribution: 'Google Maps'
                 }});
 
-                // 2. Khởi tạo Tile Google Vệ tinh
+                // 2. Tile Google Vệ tinh
                 var googleSat = L.tileLayer('https://mt1.google.com/vt/lyrs=s,h&x={{x}}&y={{y}}&z={{z}}', {{
                     maxZoom: 20,
                     attribution: 'Google Maps Satellite'
@@ -399,7 +426,7 @@ if df is not None:
                     layers: [googleStreets]
                 }}).setView({json.dumps(map_center)}, {zoom_lvl});
 
-                // 4. Bảng chuyển đổi lớp nền góc trên bên phải
+                // 4. Bảng chuyển lớp nền
                 var baseMaps = {{
                     "🗺️ Google Đường phố": googleStreets,
                     "🛰️ Google Vệ tinh": googleSat
@@ -440,7 +467,56 @@ if df is not None:
                     if (breakMarkerData.tooltip) bMarker.bindTooltip(breakMarkerData.tooltip);
                 }}
 
-                // 8. Cập nhật lại size khung hiển thị
+                // -------------------------------------------------------------
+                // 8. TÍNH NĂNG ĐỊNH VỊ GPS ĐIỆN THOẠI / THIẾT BỊ NGƯỜI DÙNG
+                // -------------------------------------------------------------
+                var userMarker = null;
+                var accuracyCircle = null;
+
+                function onLocationFound(e) {{
+                    var radius = e.accuracy / 2;
+
+                    if (userMarker) {{
+                        userMarker.setLatLng(e.latlng);
+                        accuracyCircle.setLatLng(e.latlng).setRadius(radius);
+                    }} else {{
+                        var userIcon = L.divIcon({{ className: 'user-location-marker' }});
+                        userMarker = L.marker(e.latlng, {{ icon: userIcon }}).addTo(map)
+                            .bindPopup("<b>Vị trí hiện tại của bạn</b>").openPopup();
+                        accuracyCircle = L.circle(e.latlng, radius, {{
+                            color: '#2563EB',
+                            fillColor: '#3B82F6',
+                            fillOpacity: 0.15,
+                            weight: 1
+                        }}).addTo(map);
+                    }}
+                }}
+
+                function onLocationError(e) {{
+                    alert("Không thể lấy vị trí hiện tại: " + e.message + "\\nVui lòng bật GPS/Chia sẻ vị trí trên trình duyệt điện thoại.");
+                }}
+
+                map.on('locationfound', onLocationFound);
+                map.on('locationerror', onLocationError);
+
+                // Tự động định vị vị trí lần đầu (Không tự động pan camera nếu đang xem vị trí đứt cáp)
+                map.locate({{ watch: true, setView: false, enableHighAccuracy: true }});
+
+                // Nút bấm Custom để bay tới vị trí người dùng
+                var locateControl = L.Control.extend({{
+                    options: {{ position: 'topleft' }},
+                    onAdd: function (map) {{
+                        var container = L.DomUtil.create('div', 'leaflet-control-locate');
+                        container.innerHTML = '🎯';
+                        container.title = "Định vị vị trí của tôi";
+                        container.onclick = function() {{
+                            map.locate({{ setView: true, maxZoom: 18, enableHighAccuracy: true }});
+                        }};
+                        return container;
+                    }}
+                }});
+                map.addControl(new locateControl());
+
                 setTimeout(function() {{
                     map.invalidateSize();
                 }}, 200);
