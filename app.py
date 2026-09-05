@@ -12,17 +12,25 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 ) 
 
-# CSS tùy chỉnh để làm tràn viền bản đồ, loại bỏ khoảng trắng thừa ở trên cùng
+# CSS tùy chỉnh để làm tràn viền bản đồ, loại bỏ khoảng trắng thừa xung quanh
 st.markdown("""
     <style>
-        .block-container {
-            padding-top: 1rem;
-            padding-bottom: 0rem;
-            padding-left: 1rem;
-            padding-right: 1rem;
+        /* Xóa lề thừa xung quanh trang Streamlit */
+        .main .block-container {
+            padding-top: 0rem !important;
+            padding-bottom: 0rem !important;
+            padding-left: 0rem !important;
+            padding-right: 0rem !important;
+            max-width: 100% !important;
+        }
+        /* Ép iframe chứa Folium mở rộng 100% chiều rộng và tự điều chỉnh chiều cao */
+        div[data-testid="stIframe"] {
+            width: 100% !important;
+            height: calc(100vh - 1rem) !important;
         }
         iframe {
             width: 100% !important;
+            height: 100% !important;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -62,7 +70,7 @@ def load_server_data():
 # 2. Tải Dữ Liệu Từ Server 
 df, file_name = load_server_data() 
 
-# ĐẶT TIÊU ĐỀ Ở TÊN CÙNG BÊN TRÁI (Trên đầu Sidebar)
+# ĐẶT TIÊU ĐỀ Ở TRÊN CÙNG BÊN TRÁI (Đầu Sidebar)
 st.sidebar.markdown("### ⚡ TQG-XÁC ĐỊNH VỊ TRÍ ĐỨT CÁP")
 st.sidebar.caption("Fiber Optic Break Location Finder - FPT Telecom System")
 st.sidebar.markdown("---")
@@ -287,8 +295,14 @@ if df is not None:
                 fill_color="white" 
             ).add_to(m) 
 
-    # Đặt height cố định tầm 780px để mở rộng màn hình map tối đa
-    st_folium(m, use_container_width=True, height=780, key="folium_map") 
+    # Render bản đồ tràn viền màn hình
+    st_folium(
+        m, 
+        use_container_width=True, 
+        height=880, 
+        returned_objects=[],
+        key="folium_map"
+    ) 
 
 else: 
     st.error("❌ Không tìm thấy file Excel trên Server. Vui lòng kiểm tra lại tên file `Danh-Sách-Đoạn-Cáp.xlsx` trong thư mục chạy mã.")
