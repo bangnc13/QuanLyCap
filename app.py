@@ -108,7 +108,7 @@ st.sidebar.markdown('<div class="sidebar-title">⚡ TQG-XÁC ĐỊNH VỊ TRÍ �
 st.sidebar.markdown('<div class="sidebar-subtitle"></div>', unsafe_allow_html=True)
 
 if df is not None: 
-    st.sidebar.success(f" Make by BangNC13) 
+    st.sidebar.success(f" Make by BangNC13") 
     
     df.columns = [str(col).strip() for col in df.columns] 
     
