@@ -7,24 +7,21 @@ import json
 
 # 1. Cấu hình trang Streamlit 
 st.set_page_config(
-    page_title="Xác Định Vị Trí Đứt Cáp Make by BangNC13", 
+    page_title="Xác Định Vị Trí Đứt Cáp - BangNC13", 
     layout="wide", 
     initial_sidebar_state="expanded"
 ) 
 
-# CSS Tùy chỉnh: Tràn viền map sát các cạnh và tối ưu góc trên menu
+# CSS Tùy chỉnh
 st.markdown("""
     <style>
-        /* 1. Reset margin, padding và chống cuộn toàn trang */
         html, body, [data-testid="stAppViewContainer"], .main, .stApp {
             margin: 0 !important;
             padding: 0 !important;
             height: 100vh !important;
-            max-height: 100vh !important;
             overflow: hidden !important;
         }
 
-        /* 2. Cấu hình Sidebar: Đưa nội dung sát top nhưng vẫn có khoảng đệm hài hòa */
         section[data-testid="stSidebar"] {
             z-index: 999999 !important;
         }
@@ -34,26 +31,11 @@ st.markdown("""
             padding-right: 1rem !important;
         }
 
-        /* 3. Đưa nút đóng/mở Sidebar lên vị trí cố định trên cùng */
-        [data-testid="stSidebarCollapseButton"], 
-        [data-testid="collapsedControl"] {
-            z-index: 1000000 !important;
-            position: fixed !important;
-            top: 10px !important;
-            left: 10px !important;
-            background-color: rgba(255, 255, 255, 0.9) !important;
-            border-radius: 50% !important;
-            box-shadow: 0px 2px 6px rgba(0,0,0,0.3) !important;
-            padding: 4px !important;
-        }
-
-        /* 4. Tối ưu tiêu đề trên cùng bên trái thanh Menu */
         .sidebar-title {
             font-size: 1.15rem !important;
             font-weight: 700 !important;
             color: #1F2937 !important;
             margin-bottom: 2px !important;
-            padding-top: 0px !important;
         }
         .sidebar-subtitle {
             font-size: 0.8rem !important;
@@ -61,14 +43,12 @@ st.markdown("""
             margin-bottom: 12px !important;
         }
 
-        /* 5. Ẩn Header mặc định của Streamlit */
         header[data-testid="stHeader"] {
             background: transparent !important;
             height: 0px !important;
             z-index: 999999 !important;
         }
 
-        /* 6. Xóa khoảng trống container chính để map tràn viền tuyệt đối */
         .main .block-container, 
         [data-testid="stMainBlockContainer"],
         [data-testid="stVerticalBlock"],
@@ -78,24 +58,15 @@ st.markdown("""
             gap: 0rem !important;
             max-width: 100vw !important;
             height: 100vh !important;
-            max-height: 100vh !important;
         }
 
-        /* 7. Ép iframe Leaflet tràn tuyệt đối toàn màn hình */
         iframe {
             width: 100vw !important;
             height: 100vh !important;
-            min-height: 100vh !important;
-            max-height: 100vh !important;
             border: none !important;
             margin: 0 !important;
             padding: 0 !important;
             display: block !important;
-            position: absolute !important;
-            top: 0 !important;
-            left: 0 !important;
-            bottom: 0 !important;
-            right: 0 !important;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -106,7 +77,6 @@ if "break_result" not in st.session_state:
 if "break_gps" not in st.session_state: 
     st.session_state.break_gps = None 
 
-# Hàm tự động tìm và đọc file Excel có sẵn trên Server 
 @st.cache_data 
 def load_server_data(): 
     possible_files = [ 
@@ -115,7 +85,7 @@ def load_server_data():
         "data.xlsx",  
         "Danh-Sách-Đoạn-Cáp.xls" 
     ] 
-      
+    
     selected_file = None 
     for f in possible_files: 
         if os.path.exists(f): 
@@ -132,19 +102,16 @@ def load_server_data():
         return df, selected_file 
     return None, None 
 
-# 2. Tải Dữ Liệu Từ Server 
 df, file_name = load_server_data() 
 
-# Hiển thị tiêu đề ở trên cùng bên trái thanh Menu (Sidebar)
 st.sidebar.markdown('<div class="sidebar-title">⚡ TQG-XÁC ĐỊNH VỊ TRÍ ĐỨT CÁP</div>', unsafe_allow_html=True)
 st.sidebar.markdown('<div class="sidebar-subtitle">Fiber Optic Break Location Finder - FPT Telecom System</div>', unsafe_allow_html=True)
 
 if df is not None: 
     st.sidebar.success(f"🐒 Make by BangNC13") 
-      
+    
     df.columns = [str(col).strip() for col in df.columns] 
-      
-    # Tự động tìm các cột Tọa độ 
+    
     lat_col1 = next((c for c in df.columns if 'lat' in c.lower() and '1' in c.lower()), None) 
     lon_col1 = next((c for c in df.columns if 'lng' in c.lower() or ('lon' in c.lower() and '1' in c.lower())), None) 
     lat_col2 = next((c for c in df.columns if 'lat' in c.lower() and '2' in c.lower()), None) 
@@ -154,7 +121,6 @@ if df is not None:
         lat_col1 = next((c for c in df.columns if 'lat' in c.lower() or 'vĩ độ' in c.lower()), None) 
         lon_col1 = next((c for c in df.columns if 'lng' in c.lower() or 'lon' in c.lower() or 'kinh độ' in c.lower()), None) 
 
-    # Lọc tuyến cáp theo POP 
     if 'Tên đoạn cáp' in df.columns: 
         df['POP'] = df['Tên đoạn cáp'].apply(lambda x: str(x).split('.')[0] if '.' in str(x) else str(x)) 
         pop_list = sorted(df['POP'].unique()) 
@@ -163,7 +129,6 @@ if df is not None:
     else: 
         pop_df = df.copy() 
 
-    # Dựng đồ thị kết nối & Lưu tọa độ các Node 
     G = nx.Graph() 
     node_coords = {} 
 
@@ -171,10 +136,10 @@ if df is not None:
         k1 = str(row.get('Điểm KN1', '')).strip() 
         k2 = str(row.get('Điểm KN2', '')).strip() 
         cable = str(row.get('Tên đoạn cáp', f"{k1}-{k2}")).strip() 
-          
+        
         len_val = row.get('Chiều dài thực (m)') 
         length = float(len_val) if pd.notnull(len_val) else 0.0 
-          
+        
         try: 
             if lat_col1 and lon_col1 and pd.notnull(row[lat_col1]) and pd.notnull(row[lon_col1]): 
                 node_coords[k1] = (float(row[lat_col1]), float(row[lon_col1])) 
@@ -188,7 +153,7 @@ if df is not None:
 
     st.sidebar.markdown("---") 
     st.sidebar.subheader("📍 THÔNG TIN ĐO (OTDR)") 
-      
+    
     all_nodes = sorted(list(G.nodes())) 
     if all_nodes: 
         start_node = st.sidebar.selectbox("Điểm đo (Đang đứng)", all_nodes, key="start_node") 
@@ -207,7 +172,6 @@ if df is not None:
             st.session_state.break_gps = None 
             st.rerun() 
 
-        # Tính toán điểm đứt 
         if btn_calc and start_node and direction_node: 
             current = start_node 
             nxt = direction_node 
@@ -256,13 +220,11 @@ if df is not None:
             st.session_state.break_gps = b_gps 
             st.rerun() 
 
-    # Display Báo lỗi / Vị trí đứt ở Sidebar 
     if st.session_state.break_result: 
         res = st.session_state.break_result 
         st.sidebar.error("📍 VỊ TRÍ ĐỨT CÁP DỰ KIẾN") 
         st.sidebar.markdown(f"**Đoạn cáp:** `{res['cable']}`") 
         
-        # Thẻ thông tin khoảng cách chi tiết đến 2 điểm kết nối
         st.sidebar.markdown("---")
         st.sidebar.markdown("**📐 Khoảng cách đến 2 điểm kết nối:**")
         st.sidebar.info(
@@ -281,7 +243,7 @@ if df is not None:
     zoom_lvl = 12 
 
     if st.session_state.break_gps: 
-        map_center = st.session_state.break_gps 
+        map_center = list(st.session_state.break_gps)
         zoom_lvl = 17 
     elif len(node_coords) > 0: 
         first_coord = list(node_coords.values())[0] 
@@ -292,7 +254,6 @@ if df is not None:
     markers = []
     break_marker = None
 
-    # Nếu ĐÃ TÍNH ĐƯỢC VỊ TRÍ ĐỨT -> Chỉ vẽ tuyến bị đứt
     if st.session_state.break_result: 
         u = st.session_state.break_result['from'] 
         v = st.session_state.break_result['to'] 
@@ -318,12 +279,11 @@ if df is not None:
         if st.session_state.break_gps: 
             res = st.session_state.break_result
             break_marker = {
-                "coords": st.session_state.break_gps,
+                "coords": list(st.session_state.break_gps),
                 "popup": f"<b>🚨 VỊ TRÍ ĐỨT CÁP: {res['cable']}</b><br>• Cách {res['from']}: {res['d1']:.1f}m<br>• Cách {res['to']}: {res['d2']:.1f}m",
                 "tooltip": "Vị trí đứt cáp"
             }
 
-    # Nếu CHƯA ĐO -> Hiển thị toàn bộ mạng cáp để quan sát tổng thể
     else: 
         for u, v, data in G.edges(data=True): 
             if u in node_coords and v in node_coords: 
@@ -344,7 +304,7 @@ if df is not None:
                 "radius": 4
             })
 
-    # Template HTML/JS render Leaflet
+    # Sửa lại HTML/JS của Leaflet dùng CartoDB Tile Server (đảm bảo hiển thị 100%)
     leaflet_html = f"""
     <!DOCTYPE html>
     <html>
@@ -354,11 +314,17 @@ if df is not None:
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
         <style>
-            html, body, #map {{
+            html, body {{
                 width: 100%;
-                height: 100%;
+                height: 100vh;
                 margin: 0;
                 padding: 0;
+                overflow: hidden;
+            }}
+            #map {{
+                width: 100%;
+                height: 100vh;
+                background-color: #e5e3df;
             }}
             .custom-break-icon {{
                 background-color: #EF4444;
@@ -381,51 +347,60 @@ if df is not None:
     <body>
         <div id="map"></div>
         <script>
-            var map = L.map('map', {{
-                zoomControl: true,
-                attributionControl: false
-            }}).setView({json.dumps(map_center)}, {zoom_lvl});
+            document.addEventListener("DOMContentLoaded", function() {{
+                var map = L.map('map', {{
+                    zoomControl: true,
+                    attributionControl: false
+                }}).setView({json.dumps(map_center)}, {zoom_lvl});
 
-            L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
-                maxZoom: 19
-            }}).addTo(map);
-
-            var polylinesData = {json.dumps(polylines)};
-            polylinesData.forEach(function(item) {{
-                var line = L.polyline(item.coords, {{
-                    color: item.color,
-                    weight: item.weight,
-                    opacity: item.opacity
+                // Sử dụng CartoDB Voyager Tile giúp load nhanh và không bị block Tile
+                L.tileLayer('https://{{s}}.basemaps.cartocdn.com/rastertiles/voyager/{{z}}/{{x}}/{{y}}{{r}}.png', {{
+                    maxZoom: 19,
+                    subdomains: 'abcd'
                 }}).addTo(map);
-                if (item.tooltip) line.bindTooltip(item.tooltip);
-            }});
 
-            var markersData = {json.dumps(markers)};
-            markersData.forEach(function(item) {{
-                var circle = L.circleMarker(item.coords, {{
-                    radius: item.radius,
-                    color: item.color,
-                    fillColor: '#FFFFFF',
-                    fillOpacity: 0.9,
-                    weight: 2
-                }}).addTo(map);
-                if (item.popup) circle.bindPopup(item.popup);
-                if (item.tooltip) circle.bindTooltip(item.tooltip);
-            }});
+                var polylinesData = {json.dumps(polylines)};
+                polylinesData.forEach(function(item) {{
+                    var line = L.polyline(item.coords, {{
+                        color: item.color,
+                        weight: item.weight,
+                        opacity: item.opacity
+                    }}).addTo(map);
+                    if (item.tooltip) line.bindTooltip(item.tooltip);
+                }});
 
-            var breakMarkerData = {json.dumps(break_marker)};
-            if (breakMarkerData) {{
-                var breakIcon = L.divIcon({{ className: 'custom-break-icon' }});
-                var bMarker = L.marker(breakMarkerData.coords, {{ icon: breakIcon }}).addTo(map);
-                if (breakMarkerData.popup) bMarker.bindPopup(breakMarkerData.popup).openPopup();
-                if (breakMarkerData.tooltip) bMarker.bindTooltip(breakMarkerData.tooltip);
-            }}
+                var markersData = {json.dumps(markers)};
+                markersData.forEach(function(item) {{
+                    var circle = L.circleMarker(item.coords, {{
+                        radius: item.radius,
+                        color: item.color,
+                        fillColor: '#FFFFFF',
+                        fillOpacity: 0.9,
+                        weight: 2
+                    }}).addTo(map);
+                    if (item.popup) circle.bindPopup(item.popup);
+                    if (item.tooltip) circle.bindTooltip(item.tooltip);
+                }});
+
+                var breakMarkerData = {json.dumps(break_marker)};
+                if (breakMarkerData) {{
+                    var breakIcon = L.divIcon({{ className: 'custom-break-icon' }});
+                    var bMarker = L.marker(breakMarkerData.coords, {{ icon: breakIcon }}).addTo(map);
+                    if (breakMarkerData.popup) bMarker.bindPopup(breakMarkerData.popup).openPopup();
+                    if (breakMarkerData.tooltip) bMarker.bindTooltip(breakMarkerData.tooltip);
+                }}
+
+                // Bắt buộc tính lại kích thước Map tránh lỗi màn hình xám trong Iframe Streamlit
+                setTimeout(function() {{
+                    map.invalidateSize();
+                }}, 300);
+            }});
         </script>
     </body>
     </html>
     """
 
-    # Hiển thị Leaflet Map qua Streamlit Components
+    # Render Leaflet Map
     components.html(leaflet_html, height=1000, scrolling=False)
 
 else: 
