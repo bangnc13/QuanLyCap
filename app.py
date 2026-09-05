@@ -13,25 +13,26 @@ st.set_page_config(
     initial_sidebar_state="expanded" 
 ) 
  
-# 2. CSS Tùy chỉnh TRÀN MÀN HÌNH & BẢO TỒN NÚT ĐẨY SIDEBAR 
+# 2. CSS Tùy chỉnh TRÀN MÀN HÌNH CHUẨN (KHÔNG BỊ ĐẨY KHUNG HÌNH)
 st.markdown(""" 
     <style> 
-        /* 1. Xóa cuộn trang chính và thụt lề nền */ 
+        /* 1. Xóa cuộn trang và ép toàn bộ giao diện đúng 100vh */ 
         html, body, [data-testid="stAppViewContainer"], .main, .stApp { 
             margin: 0 !important; 
             padding: 0 !important; 
             height: 100vh !important; 
+            max-height: 100vh !important;
             overflow: hidden !important; 
         } 
  
-        /* 2. Triệt tiêu nền Header nhưng GIỮ LẠI các nút hệ thống */ 
+        /* 2. Triệt tiêu nền Header */ 
         header[data-testid="stHeader"] { 
             background: transparent !important; 
             height: 0px !important; 
             z-index: 999999 !important; 
         } 
  
-        /* 3. Đưa nút Mở/Ẩn Sidebar lên lớp ưu tiên cao nhất để luôn click được */ 
+        /* 3. Đưa nút Sidebar lên trên cùng */ 
         [data-testid="stSidebarCollapseButton"],  
         [data-testid="collapsedControl"] { 
             z-index: 1000000 !important; 
@@ -44,7 +45,7 @@ st.markdown("""
             padding: 4px !important; 
         } 
  
-        /* 4. Xóa khoảng trắng phía trên Container nội dung chính */ 
+        /* 4. Xóa margin/padding khung chứa chính */ 
         .main .block-container,  
         [data-testid="stMainBlockContainer"], 
         [data-testid="stVerticalBlock"] { 
@@ -52,19 +53,21 @@ st.markdown("""
             margin: 0 !important; 
             gap: 0rem !important; 
             max-width: 100vw !important; 
+            height: 100vh !important;
         } 
  
-        /* 5. Căn bản đồ tràn 100% màn hình tự nhiên mà không che phủ nút hệ thống */ 
+        /* 5. Ép iframe Bản đồ chỉ cao vừa đúng 100% màn hình hiển thị (100vh) */ 
         [data-testid="element-container"], .stCustomComponentV1, iframe { 
             width: 100vw !important; 
             height: 100vh !important; 
+            max-height: 100vh !important;
             border: none !important; 
             margin: 0 !important; 
             padding: 0 !important; 
             display: block !important; 
         } 
  
-        /* 6. Đảm bảo Sidebar nằm đè lên bản đồ khi mở */ 
+        /* 6. Sidebar nổi phía trên */ 
         section[data-testid="stSidebar"] { 
             z-index: 999999 !important; 
         } 
@@ -165,7 +168,7 @@ if df is not None:
         neighbors = list(G.neighbors(start_node)) if start_node in G else [] 
         direction_node = st.sidebar.selectbox("Hướng đo (Xuôi ngọn / Về ODF)", neighbors, key="direction_node") 
  
-        measured_len = st.sidebar.number_input("Chiều dài đo được (Mét)", min_value=0.0, value=170.0, step=10.0, key="measured_len") 
+        measured_len = st.sidebar.number_input("Chiều dài đo được (Mét)", min_value=0.0, value=200.0, step=10.0, key="measured_len") 
  
         col_btn1, col_btn2 = st.sidebar.columns(2) 
         with col_btn1: 
@@ -224,7 +227,7 @@ if df is not None:
  
             st.session_state.break_result = b_res 
             st.session_state.break_gps = b_gps 
-            st.rerun()  # Rerun để làm mới bản đồ với tâm mới ngay lập tức
+            st.rerun() 
  
     if st.session_state.break_result: 
         res = st.session_state.break_result 
@@ -239,7 +242,7 @@ if df is not None:
             st.sidebar.markdown(f"📍 **GPS:** `{gps[0]:.6f}, {gps[1]:.6f}`") 
             st.sidebar.markdown(f"👉 [**Mở trên Google Maps**]({gmap_url})") 
  
-    # Tính toán vị trí tâm và độ zoom cho Bản đồ 
+    # Tính toán tọa độ tâm
     map_center = [21.0285, 105.8542] 
     zoom_lvl = 12 
  
@@ -251,7 +254,7 @@ if df is not None:
         map_center = [first_coord[0], first_coord[1]] 
         zoom_lvl = 15 
  
-    # Khởi tạo bản đồ Folium
+    # Khởi tạo bản đồ
     m = folium.Map(location=map_center, zoom_start=zoom_lvl, tiles=None) 
  
     folium.TileLayer( 
@@ -325,14 +328,13 @@ if df is not None:
                 fill_color="white" 
             ).add_to(m) 
  
-    # Tải bản đồ lên giao diện và di chuyển tâm chính xác đến điểm đứt cáp
+    # Hiển thị bản đồ chính xác giữa màn hình
     st_folium(
         m, 
         use_container_width=True, 
-        height=2000, 
+        height=None,             # Đặt chiều cao bằng None để CSS 100vh kiểm soát hoàn toàn
         key="folium_map",
-        center=map_center,
-        zoom=zoom_lvl
+        returned_objects=[]      # Ngăn Streamlit ghi nhận tương tác cuộn làm trôi góc nhìn tâm
     ) 
  
 else: 
