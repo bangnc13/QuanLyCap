@@ -165,8 +165,10 @@ if df is not None:
 
         col_btn1, col_btn2 = st.sidebar.columns(2)
         with col_btn1:
+            
             btn_calc = st.button("🎯 Xác định", type="primary", use_container_width=True)
         with col_btn2:
+            
             btn_reset = st.button("🔄 Xóa", use_container_width=True)
 
         if btn_reset:
