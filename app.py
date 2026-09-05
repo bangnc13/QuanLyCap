@@ -8,7 +8,7 @@ from PIL import Image
 
 # 1. Cấu hình trang Streamlit
 st.set_page_config(
-    page_title="Xác Định Vị Trí ĐỨT CÁP - FPT Telecom",
+    page_title="Xác Định Vị Trí ĐỨT CÁP - BangNC13",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -112,11 +112,11 @@ if os.path.exists("image_0.png"):
     st.sidebar.image(image, use_container_width=True)
 
 st.sidebar.markdown("### ⚡ TQG-XÁC ĐỊNH VỊ TRÍ ĐỨT CÁP")
-st.sidebar.caption("Fiber Optic Break Location Finder - FPT Telecom System")
+st.sidebar.caption("FPT Telecom System - Make by BangNC13")
 st.sidebar.markdown("---")
 
 if df is not None:
-    st.sidebar.success(" Make by BangNC13")
+
     
     df.columns = [str(col).strip() for col in df.columns]
     
