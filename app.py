@@ -178,7 +178,7 @@ if df is not None:
             st.sidebar.markdown(f"📍 **GPS:** `{gps[0]:.6f}, {gps[1]:.6f}`") 
             st.sidebar.markdown(f"👉 [**Mở trên Google Maps**]({gmap_url})") 
 
-    # 3. Hiển thị Bản đồ Leaflet (Cấu hình Nền Google Maps)
+    # 3. Hiển thị Bản đồ Leaflet (Chỉ dùng Google Maps)
     map_center = [21.0285, 105.8542] 
     zoom_lvl = 12 
  
@@ -190,7 +190,7 @@ if df is not None:
         map_center = [first_coord[0], first_coord[1]] 
         zoom_lvl = 15 
 
-    # Khởi tạo khung bản đồ trống
+    # Khởi tạo bản đồ
     m = folium.Map(location=map_center, zoom_start=zoom_lvl, tiles=None) 
 
     # Lớp 1: Google Maps Giao thông (Đường bộ)
@@ -211,15 +211,7 @@ if df is not None:
         control=True
     ).add_to(m)
 
-    # Lớp 3: CartoDB Positron (Giao diện sáng nhẹ)
-    folium.TileLayer(
-        tiles="CartoDB positron",
-        name="CartoDB (Nền sáng)",
-        overlay=False,
-        control=True
-    ).add_to(m)
-
-    # Thêm công cụ chọn lớp nền ở góc trên bên phải bản đồ
+    # Công cụ chọn lớp bản đồ ở góc trên bên phải
     folium.LayerControl(position="topright").add_to(m)
 
     # Nếu ĐÃ TÍNH ĐƯỢC VỊ TRÍ ĐỨT -> Chỉ vẽ tuyến bị đứt 
