@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import folium
 import numpy as np
 import pandas as pd
@@ -12,10 +13,12 @@ from streamlit_folium import st_folium
 st.set_page_config(
     page_title="Tối ưu đường di chuyển xe máy", layout="wide"
 )
-st.title("🏍️ Tối ưu hóa quãng đường di chuyển (Xe máy)")
+
+# Thêm tiêu đề chính vào thanh Menu bên trái
+st.sidebar.title("🏍️ Tối ưu hóa quãng đường di chuyển (Xe máy)")
 
 
-# 1. Đọc file GeoJSON
+# 1. Đọc file GeoJSON và chỉ lọc các điểm định dạng TQGP0xx
 @st.cache_data
 def load_geojson(file_path):
     if not os.path.exists(file_path):
@@ -38,7 +41,8 @@ def load_geojson(file_path):
                     if isinstance(val, (str, int))
                 ]
                 for p_name in possible_names:
-                    if p_name:
+                    # Lọc chỉ lấy các tên có định dạng TQGP0...
+                    if p_name and "TQGP0" in p_name.upper():
                         points[p_name] = {"lat": coords[1], "lon": coords[0]}
     return points
 
@@ -47,14 +51,16 @@ GEOJSON_FILE = "data.geojson"
 all_points = load_geojson(GEOJSON_FILE)
 
 if not all_points:
-    st.error(f"⚠️ Không tìm thấy file '{GEOJSON_FILE}' hoặc file bị rỗng!")
+    st.sidebar.error(
+        f"⚠️ Không tìm thấy điểm nào dạng 'TQGP0xx' trong '{GEOJSON_FILE}'!"
+    )
 
-unique_keys = list(all_points.keys())
+unique_keys = sorted(list(all_points.keys()))
 
-# 2. Vị trí xuất phát: Chọn từ danh sách GeoJSON
+# 2. Vị trí xuất phát: Chọn từ danh sách GeoJSON (đã lọc TQGP0)
 st.sidebar.header("📍 Chọn điểm xuất phát")
 start_point_name = st.sidebar.selectbox(
-    "Chọn điểm xuất phát (từ GeoJSON):",
+    "Chọn điểm xuất phát:",
     options=unique_keys,
     index=0 if unique_keys else None,
 )
@@ -68,11 +74,11 @@ else:
 st.sidebar.header("📋 Danh sách tập điểm cần đến")
 
 selected_from_list = st.sidebar.multiselect(
-    "Chọn các điểm cần đến từ tập dữ liệu:", options=unique_keys
+    "Chọn các điểm cần đến (TQGP0xx):", options=unique_keys
 )
 
 uploaded_file = st.sidebar.file_uploader(
-    "Hoặc Upload file Excel chứa cột danh sách điểm:", type=["xlsx", "xls"]
+    "Hoặc Upload file Excel chứa danh sách điểm:", type=["xlsx", "xls"]
 )
 excel_points = []
 
@@ -86,27 +92,29 @@ if uploaded_file:
             if not val_clean or val_clean == "nan":
                 continue
 
-            if val_clean in all_points:
-                excel_points.append(val_clean)
-                continue
-
-            alt_val = val_clean.replace("/HO", "/HƠ").replace("/HƠ", "/HO")
-            if alt_val in all_points:
-                excel_points.append(alt_val)
-                continue
-
-            prefix_match = val_clean.split("/")[0]
-            if prefix_match in all_points:
-                excel_points.append(prefix_match)
+            # Chỉ giữ lại giá trị phù hợp định dạng TQGP0
+            if "TQGP0" in val_clean.upper():
+                if val_clean in all_points:
+                    excel_points.append(val_clean)
+                else:
+                    alt_val = val_clean.replace("/HO", "/HƠ").replace(
+                        "/HƠ", "/HO"
+                    )
+                    if alt_val in all_points:
+                        excel_points.append(alt_val)
+                    else:
+                        prefix_match = val_clean.split("/")[0]
+                        if prefix_match in all_points:
+                            excel_points.append(prefix_match)
 
         st.sidebar.info(
-            f"Tìm thấy {len(excel_points)} điểm hợp lệ từ file Excel."
+            f"Tìm thấy {len(excel_points)} điểm TQGP0xx hợp lệ từ file Excel."
         )
     except Exception as e:
         st.sidebar.error(f"Lỗi đọc file Excel: {e}")
 
 final_selected_names = list(set(selected_from_list + excel_points))
-# Loai bo diem xuat phat khoi danh sach diem den neu bi trung
+# Loại bỏ điểm xuất phát khỏi danh sách điểm đến nếu bị trùng
 if start_point_name in final_selected_names:
     final_selected_names.remove(start_point_name)
 
@@ -156,7 +164,7 @@ if "calculated_route" not in st.session_state:
 
 if st.sidebar.button("🚀 Tối ưu đường đi XE MÁY"):
     if not final_selected_names:
-        st.warning("Vui lòng chọn hoặc upload ít nhất 1 tập điểm hợp lệ!")
+        st.sidebar.warning("Vui lòng chọn hoặc upload ít nhất 1 điểm!")
     else:
         with st.spinner("Đang tính toán lộ trình xe máy..."):
             target_points = [
@@ -174,7 +182,7 @@ if st.sidebar.button("🚀 Tối ưu đường đi XE MÁY"):
             st.session_state.start_coords = start_coords
             st.session_state.start_name = start_point_name
 
-# Hiển thị Bản đồ Nền Google Maps
+# Tính toán & Hiển thị thông số kết quả sang Sidebar
 if st.session_state.calculated_route is not None:
     optimized_route = st.session_state.calculated_route
     s_lat, s_lon = st.session_state.start_coords
@@ -185,11 +193,13 @@ if st.session_state.calculated_route is not None:
     ]
     detailed_path, real_distance = get_route_osrm(stopping_coords)
 
-    st.subheader(
-        f"📊 Lộ trình xe máy tối ưu (Quãng đường thực tế ~ {real_distance:.2f} km)"
+    # Đưa kết quả lộ trình vào sidebar trái
+    st.sidebar.markdown("---")
+    st.sidebar.success(
+        f"📊 **Lộ trình xe máy tối ưu**\n\nQuãng đường thực tế: **~ {real_distance:.2f} km**"
     )
 
-    # Sử dụng Google Maps Đường Phố chuẩn
+    # Khởi tạo bản đồ Google Maps Đường phố
     m = folium.Map(
         location=[s_lat, s_lon],
         zoom_start=14,
@@ -205,7 +215,7 @@ if st.session_state.calculated_route is not None:
         strings={"title": "Định vị vị trí của tôi"},
     ).add_to(m)
 
-    # Marker điểm xuất phát (Đỏ)
+    # Marker xuất phát (Màu đỏ)
     folium.Marker(
         [s_lat, s_lon],
         popup=f"Xuất phát: {s_name}",
@@ -213,7 +223,7 @@ if st.session_state.calculated_route is not None:
         icon=folium.Icon(color="red", icon="info-sign"),
     ).add_to(m)
 
-    # Marker các điểm đến theo thứ tự
+    # Marker điểm đến theo thứ tự (Xanh)
     for idx, point in enumerate(optimized_route, start=1):
         p_lat, p_lon = point["lat"], point["lon"]
         folium.Marker(
@@ -225,10 +235,23 @@ if st.session_state.calculated_route is not None:
             ),
         ).add_to(m)
 
-    # Đường xe máy màu đỏ nổi bật
+    # Đường chỉ dẫn xe máy
     folium.PolyLine(
         detailed_path, color="#e63946", weight=5, opacity=0.85
     ).add_to(m)
 
     m.fit_bounds(stopping_coords)
-    st_folium(m, use_container_width=True, height=800, returned_objects=[])
+
+    # Hiển thị View Map tràn viền góc phải màn hình
+    st_folium(m, use_container_width=True, height=850, returned_objects=[])
+else:
+    # Màn hình chờ mặc định khi chưa bấm tính toán
+    m_default = folium.Map(
+        location=[start_lat, start_lon],
+        zoom_start=13,
+        tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
+        attr="Google Maps",
+    )
+    st_folium(
+        m_default, use_container_width=True, height=850, returned_objects=[]
+    )
