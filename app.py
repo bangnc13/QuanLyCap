@@ -395,7 +395,7 @@ if st.session_state.calculated_route is not None:
 
     st.sidebar.markdown("---")
     st.sidebar.success(
-        f"📊 **Lộ trình xuất phát từ GPS của bạn**\n\nTổng quãng đường xe máy: **~ {real_distance:.2f} km**"
+        f"📊 **Tổng quãng đường xe máy: **~ {real_distance:.2f} km**"
     )
 
     m = build_map([s_lat, s_lon], zoom=14)
