@@ -79,9 +79,14 @@ st.markdown(
         height: 22px !important;
     }
 
-    /* ĐẨY NÚT GPS XUỐNG DƯỚI 20px */
+    /* ĐƯA NÚT GPS XUỐNG CẠNH DƯỚI BÊN PHẢI MÀN HÌNH MAP */
     .leaflet-control-locate {
-        margin-top: 20px !important;
+        position: fixed !important;
+        bottom: 30px !important;
+        right: 15px !important;
+        top: auto !important;
+        left: auto !important;
+        z-index: 99999 !important;
     }
     </style>
     """,
