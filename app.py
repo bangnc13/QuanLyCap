@@ -84,9 +84,9 @@ st.markdown(
         height: 22px !important;
     }
 
-    /* ĐẨY CỤM NÚT ZOOM (+ -) VÀ GPS XUỐNG DƯỚI */
-    .leaflet-top.leaflet-left .leaflet-control-zoom {
-        margin-top: 130px !important;
+    /* DỊCH CHUYỂN TOÀN BỘ CỤM NÚT CỦA LEAFLET GÓC TRÊN BÊN TRÁI (+, -, GPS) XUỐNG DƯỚI */
+    .leaflet-top.leaflet-left {
+        top: 120px !important;
     }
 
     /* NÚT LOCATE CONTROL (GPS NEON) */
