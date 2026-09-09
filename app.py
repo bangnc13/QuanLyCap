@@ -78,6 +78,11 @@ st.markdown(
         width: 22px !important;
         height: 22px !important;
     }
+
+    /* ĐẨY NÚT GPS XUỐNG DƯỚI 20px */
+    .leaflet-control-locate {
+        margin-top: 20px !important;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -338,7 +343,7 @@ def build_map(location, zoom=14):
         zoom_start=zoom,
         tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
         attr="Google Maps",
-        zoom_control=False,  # Đã ẩn 2 nút + - ở đây
+        zoom_control=False,
     )
 
     LocateControl(
@@ -367,7 +372,6 @@ if st.session_state.calculated_route is not None:
 
     m = build_map([s_lat, s_lon], zoom=14)
 
-    # Đã xóa tooltip dòng thông báo
     folium.Marker(
         [s_lat, s_lon],
         popup="Vị trí GPS của bạn (Xuất phát)",
@@ -396,7 +400,6 @@ if st.session_state.calculated_route is not None:
     st_folium(m, use_container_width=True, height=1000, returned_objects=[])
 else:
     m_default = build_map([curr_lat, curr_lon], zoom=14)
-    # Đã xóa tooltip dòng thông báo
     folium.Marker(
         [curr_lat, curr_lon],
         popup="Vị trí hiện tại của bạn",
