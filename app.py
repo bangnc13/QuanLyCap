@@ -4,6 +4,7 @@ import folium
 import numpy as np
 import pandas as pd
 import streamlit as st
+from folium.plugins import LocateControl
 from geopy.distance import geodesic
 from streamlit_folium import st_folium
 
@@ -116,7 +117,7 @@ def solve_tsp(start_coords, points):
     return route
 
 
-# 4. Quản lý trạng thái bằng Session State
+# 4. Lưu trạng thái Session State
 if "calculated_route" not in st.session_state:
     st.session_state.calculated_route = None
 
@@ -152,12 +153,23 @@ if st.session_state.calculated_route is not None:
 
     st.subheader(f"📊 Kết quả lộ trình (Tổng chiều dài ~ {total_dist:.2f} km)")
 
-    # Khởi tạo bản đồ đường phố OpenStreetMap
+    # Sử dụng link CartoDB / OpenStreetMap công khai tải nhanh nền đường phố
     m = folium.Map(
-        location=[s_lat, s_lon], zoom_start=13, tiles="OpenStreetMap"
+        location=[s_lat, s_lon],
+        zoom_start=14,
+        tiles="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+        attr="&copy; OpenStreetMap contributors &copy; CARTO",
     )
 
-    # Thêm điểm xuất phát (Đỏ)
+    # Thêm nút định vị GPS Realtime lên góc bản đồ
+    LocateControl(
+        auto_start=False,
+        flyTo=True,
+        keepCurrentZoomLevel=True,
+        strings={"title": "Định vị vị trí của tôi"},
+    ).add_to(m)
+
+    # Marker xuất phát (Màu đỏ)
     folium.Marker(
         [s_lat, s_lon],
         popup="Vị trí xuất phát",
@@ -170,7 +182,7 @@ if st.session_state.calculated_route is not None:
         p_lat, p_lon = point["lat"], point["lon"]
         route_coords.append([p_lat, p_lon])
 
-        # Tạo Marker gắn số thứ tự bước di chuyển
+        # Marker điểm đến có số thứ tự
         folium.Marker(
             [p_lat, p_lon],
             popup=f"Bước {idx}: {point['name']}",
@@ -180,15 +192,15 @@ if st.session_state.calculated_route is not None:
             ),
         ).add_to(m)
 
-    # Vẽ đường nối lộ trình
+    # Vẽ tuyến đường di chuyển (Màu xanh)
     folium.PolyLine(
-        route_coords, color="#0055ff", weight=4, opacity=0.85
+        route_coords, color="#0055ff", weight=5, opacity=0.85
     ).add_to(m)
 
-    # Tự động điều chỉnh khung nhìn vừa vặn tất cả các tọa độ điểm
+    # Căn chỉnh view bao trọn toàn bộ các điểm
     m.fit_bounds(route_coords)
 
-    # Hiển thị bản đồ tràn khung hình ngang, chiều cao 650px
+    # Mở rộng kích thước khung bản đồ (chiều cao 800px)
     st_folium(
-        m, use_container_width=True, height=650, returned_objects=[]
+        m, use_container_width=True, height=800, returned_objects=[]
     )
