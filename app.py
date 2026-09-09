@@ -199,7 +199,7 @@ unique_keys = sorted(list(all_points.keys()))
 # -------------------------------------------------------------
 st.sidebar.header(" Make by BangNC13")
 search_query = st.sidebar.text_input(
-    "Nhập điểm cuối hành trình",
+    "Nhập điểm cuối hành trình (nếu muốn)",
     placeholder="Ví dụ: Bệnh viện đa khoa, Chợ Tam Cờ...",
 )
 
