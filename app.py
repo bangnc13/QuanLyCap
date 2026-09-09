@@ -247,7 +247,7 @@ if search_query:
 # -------------------------------------------------------------
 # 6. DANH SÁCH ĐIỂM CẦN GHÉ QUA (TQGP0xx)
 # -------------------------------------------------------------
-st.sidebar.header("📋 Danh sách điểm ghé (TQGP0xx)")
+st.sidebar.header("📋 Chọn lộ trình di chuyển")
 selected_from_list = st.sidebar.multiselect(
     "Chọn điểm TQGP0xx:", options=unique_keys
 )
