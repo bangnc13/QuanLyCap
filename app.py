@@ -24,7 +24,7 @@ if os.path.exists(logo_path):
     st.sidebar.image(logo_path, use_container_width=True)
 
 # -------------------------------------------------------------
-# 2. CSS ÉP BẢN ĐỒ TRÀN MÀN HÌNH & NÚT MENU NEON CHỚP NHÁY (BLINK)
+# 2. CSS ÉP BẢN ĐỒ TRÀN MÀN HÌNH & TẠO HIỆU ỨNG BLINK NÚT MENU (SIÊU CẮT LỚP)
 # -------------------------------------------------------------
 st.markdown(
     """
@@ -49,62 +49,61 @@ st.markdown(
         z-index: 99999 !important;
     }
 
-    /* ĐIỀU CHỈNH KEYFRAMES HIỆU ỨNG BLINK NEON */
-    @keyframes neonBlink {
+    /* ĐỊNH NGHĨA KEYFRAMES BLINK CHỚP NHÁY RỰC RỠ */
+    @keyframes blinkGlow {
         0% {
             background-color: #00ffcc !important;
             box-shadow: 0 0 5px #00ffcc, 0 0 10px #00ffcc !important;
             border-color: #00ffcc !important;
+            transform: scale(1);
         }
         50% {
-            background-color: #00b386 !important;
-            box-shadow: 0 0 18px #00ffcc, 0 0 35px #00ffcc, 0 0 50px rgba(0, 255, 204, 0.9) !important;
+            background-color: #00e6b8 !important;
+            box-shadow: 0 0 20px #00ffcc, 0 0 35px #00ffcc, 0 0 50px #00ffcc !important;
             border-color: #ffffff !important;
-            transform: scale(1.05);
+            transform: scale(1.12);
         }
         100% {
             background-color: #00ffcc !important;
             box-shadow: 0 0 5px #00ffcc, 0 0 10px #00ffcc !important;
             border-color: #00ffcc !important;
+            transform: scale(1);
         }
     }
 
-    /* NÚT MENU NỔI BẬT VỚI HIỆU ỨNG BLINK */
-    [data-testid="collapsedControl"],
+    /* ÉP BẮT BUỘC TẤT CẢ BIẾN THỂ CỦA NÚT SIDEBAR DÙNG HIỆU ỨNG BLINK */
+    div[data-testid="stSidebarCollapseButton"],
+    div[data-testid="collapsedControl"],
     button[aria-label="Close sidebar"],
-    button[aria-label="Open sidebar"] {
+    button[aria-label="Open sidebar"],
+    button[data-testid="baseButton-header"] {
         position: fixed !important;
         top: 15px !important;
         left: 15px !important;
-        z-index: 999999 !important;
+        z-index: 9999999 !important;
+        background-color: #00ffcc !important;
         border: 2px solid #00ffcc !important;
         border-radius: 50% !important;
-        width: 44px !important;
-        height: 44px !important;
+        width: 46px !important;
+        height: 46px !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
         cursor: pointer !important;
-        /* Áp dụng animation blink liên tục 1.5 giây */
-        animation: neonBlink 1.5s infinite ease-in-out !important;
+        /* Áp dụng Animation Blink liên tục 1.2s */
+        animation: blinkGlow 1.2s infinite ease-in-out !important;
     }
 
-    [data-testid="collapsedControl"]:hover,
-    button[aria-label="Close sidebar"]:hover,
-    button[aria-label="Open sidebar"]:hover {
-        animation: none !important;
-        transform: scale(1.15) !important;
-        background-color: #00e6b8 !important;
-        box-shadow: 0 0 25px #00ffcc, 0 0 45px #00ffcc !important;
-    }
-
-    [data-testid="collapsedControl"] svg,
+    /* Ép icon bên trong hiển thị rõ màu đen */
+    div[data-testid="stSidebarCollapseButton"] svg,
+    div[data-testid="collapsedControl"] svg,
     button[aria-label="Close sidebar"] svg,
     button[aria-label="Open sidebar"] svg {
         fill: #000000 !important;
         color: #000000 !important;
-        width: 22px !important;
-        height: 22px !important;
+        stroke: #000000 !important;
+        width: 24px !important;
+        height: 24px !important;
     }
     </style>
     """,
