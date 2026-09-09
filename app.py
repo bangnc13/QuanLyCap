@@ -17,7 +17,7 @@ st.set_page_config(
 )
 
 # -------------------------------------------------------------
-# 1. CSS CỦA STREAMLIT & ĐỊNH DẠNG NÚT MENU NEON
+# 1. CSS ÉP BẢN ĐỒ TRÀN MÀN HÌNH (100vh) & ĐỊNH DẠNG NÚT MENU NEON
 # -------------------------------------------------------------
 st.markdown(
     """
@@ -35,14 +35,15 @@ st.markdown(
         gap: 0rem !important;
     }
     
-    /* Hide Header mặc định của Streamlit */
+    /* Hide Header mặc định của Streamlit để đụng trần sát mép trên */
     header[data-testid="stHeader"] {
         height: 0px !important;
         background: transparent !important;
         z-index: 99999 !important;
     }
 
-    /* Đội lốt nút ẩn/mở Sidebar gốc của Streamlit thành NÚT 3 GẠCH NEON */
+    /* Đội lốt nút ẩn/mở Sidebar gốc của Streamlit (nút '>>' / '<<') 
+       thành NÚT 3 GẠCH BO TRÒN MÀU XANH NEON */
     [data-testid="collapsedControl"],
     button[aria-label="Close sidebar"],
     button[aria-label="Open sidebar"] {
@@ -68,7 +69,7 @@ st.markdown(
         background-color: #00e6b8 !important;
     }
 
-    /* Icon bên trong nút menu */
+    /* Đổi icon bên trong thành biểu tượng sắc nét */
     [data-testid="collapsedControl"] svg,
     button[aria-label="Close sidebar"] svg,
     button[aria-label="Open sidebar"] svg {
@@ -329,7 +330,7 @@ if st.sidebar.button("🚀 Tối ưu đường đi XE MÁY"):
 
 
 # -------------------------------------------------------------
-# 8. HIỂN THỊ BẢN ĐỒ VIEW MAP (TỰ ĐỘNG CHÈN CSS VÀO BẢN ĐỒ)
+# 8. HIỂN THỊ BẢN ĐỒ VIEW MAP (FULL 100vh TRÀN VIỀN)
 # -------------------------------------------------------------
 def build_map(location, zoom=14):
     m = folium.Map(
@@ -337,32 +338,15 @@ def build_map(location, zoom=14):
         zoom_start=zoom,
         tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
         attr="Google Maps",
-        zoom_control=False,
+        zoom_control=True,
     )
 
-    # Đặt vị trí ban đầu ở góc dưới bên phải (bottomright)
     LocateControl(
-        position="bottomright",
         auto_start=False,
         flyTo=True,
         keepCurrentZoomLevel=True,
         strings={"title": "Định vị vị trí của tôi"},
     ).add_to(m)
-
-    # CHÈN TRỰC TIẾP CSS VÀO TRONG BẢN ĐỒ ĐỂ NÚT GPS KHÔNG BỊ MẤT VÀ NẰM ĐÚNG VỊ TRÍ
-    map_css = """
-    <style>
-    .leaflet-bottom.leaflet-right {
-        bottom: 30px !important;
-        right: 15px !important;
-    }
-    .leaflet-control-locate {
-        border: 2px solid #000 !important;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.3) !important;
-    }
-    </style>
-    """
-    m.get_root().html.add_child(folium.Element(map_css))
 
     return m
 
@@ -383,6 +367,7 @@ if st.session_state.calculated_route is not None:
 
     m = build_map([s_lat, s_lon], zoom=14)
 
+    # Đã xóa tooltip tại đây
     folium.Marker(
         [s_lat, s_lon],
         popup="Vị trí GPS của bạn (Xuất phát)",
@@ -408,9 +393,11 @@ if st.session_state.calculated_route is not None:
     ).add_to(m)
 
     m.fit_bounds(stopping_coords)
+    # 100vh ép bản đồ tràn kín màn hình trên & dưới
     st_folium(m, use_container_width=True, height=1000, returned_objects=[])
 else:
     m_default = build_map([curr_lat, curr_lon], zoom=14)
+    # Đã xóa tooltip tại đây
     folium.Marker(
         [curr_lat, curr_lon],
         popup="Vị trí hiện tại của bạn",
