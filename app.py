@@ -45,7 +45,7 @@ all_points = load_geojson(GEOJSON_FILE)
 if not all_points:
     st.error(f"⚠️ Không tìm thấy file '{GEOJSON_FILE}' hoặc file bị rỗng!")
 
-# 2. Vị trí GPS xuất phát cố định (tránh reset lại trang)
+# 2. Vị trí GPS xuất phát
 st.sidebar.header("📍 Vị trí GPS xuất phát")
 start_lat = st.sidebar.number_input(
     "Vĩ độ (Lat):", value=21.82714, format="%.5f"
@@ -138,7 +138,7 @@ if st.sidebar.button("🚀 Tối ưu đường đi"):
         )
         st.session_state.start_coords = start_coords
 
-# Hiển thị kết quả lưu trong Session State
+# Hiển thị Bản đồ
 if st.session_state.calculated_route is not None:
     optimized_route = st.session_state.calculated_route
     s_lat, s_lon = st.session_state.start_coords
@@ -152,10 +152,16 @@ if st.session_state.calculated_route is not None:
 
     st.subheader(f"📊 Kết quả lộ trình (Tổng chiều dài ~ {total_dist:.2f} km)")
 
-    m = folium.Map(location=[s_lat, s_lon], zoom_start=13)
+    # Khởi tạo bản đồ đường phố OpenStreetMap
+    m = folium.Map(
+        location=[s_lat, s_lon], zoom_start=13, tiles="OpenStreetMap"
+    )
+
+    # Thêm điểm xuất phát (Đỏ)
     folium.Marker(
         [s_lat, s_lon],
         popup="Vị trí xuất phát",
+        tooltip="Xuất phát",
         icon=folium.Icon(color="red", icon="info-sign"),
     ).add_to(m)
 
@@ -164,22 +170,25 @@ if st.session_state.calculated_route is not None:
         p_lat, p_lon = point["lat"], point["lon"]
         route_coords.append([p_lat, p_lon])
 
+        # Tạo Marker gắn số thứ tự bước di chuyển
         folium.Marker(
             [p_lat, p_lon],
             popup=f"Bước {idx}: {point['name']}",
             tooltip=f"{idx}. {point['name']}",
             icon=folium.DivIcon(
-                html=f'<div style="font-size: 10pt; color: white; background-color: blue; border-radius: 50%; width: 22px; height: 22px; text-align: center; line-height: 22px;">{idx}</div>'
+                html=f'<div style="font-size: 10pt; font-weight: bold; color: white; background-color: #0078ff; border: 2px solid white; border-radius: 50%; width: 26px; height: 26px; text-align: center; line-height: 22px;">{idx}</div>'
             ),
         ).add_to(m)
 
+    # Vẽ đường nối lộ trình
     folium.PolyLine(
-        route_coords, color="blue", weight=3, opacity=0.8
+        route_coords, color="#0055ff", weight=4, opacity=0.85
     ).add_to(m)
 
-    # Đảm bảo bản đồ giữ nguyên kích thước không giật lag
-    st_folium(m, width=900, height=500, returned_objects=[])
+    # Tự động điều chỉnh khung nhìn vừa vặn tất cả các tọa độ điểm
+    m.fit_bounds(route_coords)
 
-    route_df = pd.DataFrame(optimized_route)[["name", "lat", "lon"]]
-    route_df.index = np.arange(1, len(route_df) + 1)
-    st.dataframe(route_df)
+    # Hiển thị bản đồ tràn khung hình ngang, chiều cao 650px
+    st_folium(
+        m, use_container_width=True, height=650, returned_objects=[]
+    )
