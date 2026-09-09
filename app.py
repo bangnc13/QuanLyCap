@@ -17,7 +17,7 @@ st.set_page_config(
 )
 
 # -------------------------------------------------------------
-# 1. CSS ÉP BẢN ĐỒ TRÀN MÀN HÌNH (100vh) & ĐỊNH DẠNG NÚT MENU NEON
+# 1. CSS CỦA STREAMLIT & ĐỊNH DẠNG NÚT MENU NEON
 # -------------------------------------------------------------
 st.markdown(
     """
@@ -35,15 +35,14 @@ st.markdown(
         gap: 0rem !important;
     }
     
-    /* Hide Header mặc định của Streamlit để đụng trần sát mép trên */
+    /* Hide Header mặc định của Streamlit */
     header[data-testid="stHeader"] {
         height: 0px !important;
         background: transparent !important;
         z-index: 99999 !important;
     }
 
-    /* Đội lốt nút ẩn/mở Sidebar gốc của Streamlit (nút '>>' / '<<') 
-       thành NÚT 3 GẠCH BO TRÒN MÀU XANH NEON */
+    /* Đội lốt nút ẩn/mở Sidebar gốc của Streamlit thành NÚT 3 GẠCH NEON */
     [data-testid="collapsedControl"],
     button[aria-label="Close sidebar"],
     button[aria-label="Open sidebar"] {
@@ -69,7 +68,7 @@ st.markdown(
         background-color: #00e6b8 !important;
     }
 
-    /* Đổi icon bên trong thành biểu tượng sắc nét */
+    /* Icon bên trong nút menu */
     [data-testid="collapsedControl"] svg,
     button[aria-label="Close sidebar"] svg,
     button[aria-label="Open sidebar"] svg {
@@ -77,17 +76,6 @@ st.markdown(
         color: #000000 !important;
         width: 22px !important;
         height: 22px !important;
-    }
-
-    /* ÉP CỐ ĐỊNH NÚT GPS XUỐNG CẠNH DƯỚI BÊN PHẢI */
-    .leaflet-bottom.leaflet-right .leaflet-control-locate,
-    .leaflet-control-locate {
-        position: fixed !important;
-        bottom: 40px !important;
-        right: 20px !important;
-        top: auto !important;
-        left: auto !important;
-        z-index: 99999 !important;
     }
     </style>
     """,
@@ -341,7 +329,7 @@ if st.sidebar.button("🚀 Tối ưu đường đi XE MÁY"):
 
 
 # -------------------------------------------------------------
-# 8. HIỂN THỊ BẢN ĐỒ VIEW MAP (FULL 100vh TRÀN VIỀN)
+# 8. HIỂN THỊ BẢN ĐỒ VIEW MAP (TỰ ĐỘNG CHÈN CSS VÀO BẢN ĐỒ)
 # -------------------------------------------------------------
 def build_map(location, zoom=14):
     m = folium.Map(
@@ -352,7 +340,7 @@ def build_map(location, zoom=14):
         zoom_control=False,
     )
 
-    # Đã sửa position="bottomright" để đưa sang góc dưới bên phải
+    # Đặt vị trí ban đầu ở góc dưới bên phải (bottomright)
     LocateControl(
         position="bottomright",
         auto_start=False,
@@ -360,6 +348,21 @@ def build_map(location, zoom=14):
         keepCurrentZoomLevel=True,
         strings={"title": "Định vị vị trí của tôi"},
     ).add_to(m)
+
+    # CHÈN TRỰC TIẾP CSS VÀO TRONG BẢN ĐỒ ĐỂ NÚT GPS KHÔNG BỊ MẤT VÀ NẰM ĐÚNG VỊ TRÍ
+    map_css = """
+    <style>
+    .leaflet-bottom.leaflet-right {
+        bottom: 30px !important;
+        right: 15px !important;
+    }
+    .leaflet-control-locate {
+        border: 2px solid #000 !important;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3) !important;
+    }
+    </style>
+    """
+    m.get_root().html.add_child(folium.Element(map_css))
 
     return m
 
