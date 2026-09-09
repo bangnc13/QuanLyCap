@@ -1,6 +1,7 @@
 streamlit
-pandas
-networkx
 folium
 streamlit-folium
+geopy
+pandas
 openpyxl
+streamlit-js-eval
