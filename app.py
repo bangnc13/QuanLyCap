@@ -49,20 +49,26 @@ all_points = load_geojson(GEOJSON_FILE)
 if not all_points:
     st.error(f"⚠️ Không tìm thấy file '{GEOJSON_FILE}' hoặc file bị rỗng!")
 
-# 2. Vị trí GPS xuất phát
-st.sidebar.header("📍 Vị trí GPS xuất phát")
-start_lat = st.sidebar.number_input(
-    "Vĩ độ (Lat):", value=21.82714, format="%.5f"
+unique_keys = list(all_points.keys())
+
+# 2. Vị trí xuất phát: Chọn từ danh sách GeoJSON
+st.sidebar.header("📍 Chọn điểm xuất phát")
+start_point_name = st.sidebar.selectbox(
+    "Chọn điểm xuất phát (từ GeoJSON):",
+    options=unique_keys,
+    index=0 if unique_keys else None,
 )
-start_lon = st.sidebar.number_input(
-    "Kinh độ (Lon):", value=105.19952, format="%.5f"
-)
+
+if start_point_name:
+    start_lat = all_points[start_point_name]["lat"]
+    start_lon = all_points[start_point_name]["lon"]
+else:
+    start_lat, start_lon = 21.82714, 105.19952
 
 st.sidebar.header("📋 Danh sách tập điểm cần đến")
 
-unique_keys = list(all_points.keys())
 selected_from_list = st.sidebar.multiselect(
-    "Chọn điểm từ tập dữ liệu:", options=unique_keys
+    "Chọn các điểm cần đến từ tập dữ liệu:", options=unique_keys
 )
 
 uploaded_file = st.sidebar.file_uploader(
@@ -100,15 +106,13 @@ if uploaded_file:
         st.sidebar.error(f"Lỗi đọc file Excel: {e}")
 
 final_selected_names = list(set(selected_from_list + excel_points))
+# Loai bo diem xuat phat khoi danh sach diem den neu bi trung
+if start_point_name in final_selected_names:
+    final_selected_names.remove(start_point_name)
 
 
-# 3. Hàm gọi API OSRM tìm đường giao thông thực tế (Bike / Scooter / Driving)
+# 3. Hàm OSRM chỉ đường xe máy
 def get_route_osrm(coords_list):
-    """coords_list: danh sách tuple [(lat, lon), (lat, lon),
-
-    ...] Trả về: (toàn bộ tọa độ đường đi thực tế, tổng khoảng cách km)
-    """
-    # OSRM nhận tham số dạng (lon,lat) nối nhau bằng dấu chấm phẩy
     formatted_coords = ";".join([f"{lon},{lat}" for lat, lon in coords_list])
     url = f"http://router.project-osrm.org/route/v1/bike/{formatted_coords}?overview=full&geometries=geojson"
 
@@ -117,21 +121,18 @@ def get_route_osrm(coords_list):
         data = res.json()
         if data.get("code") == "Ok":
             route_geometry = data["routes"][0]["geometry"]["coordinates"]
-            # Chuyển từ (lon, lat) sang (lat, lon) cho Folium
             path = [[lat, lon] for lon, lat in route_geometry]
             distance_km = data["routes"][0]["distance"] / 1000.0
             return path, distance_km
     except Exception:
         pass
 
-    # Nếu OSRM bận/lỗi, quay lại dùng đường thẳng dự phòng
     total_dist = 0
     for i in range(len(coords_list) - 1):
         total_dist += geodesic(coords_list[i], coords_list[i + 1]).km
     return [[lat, lon] for lat, lon in coords_list], total_dist
 
 
-# Thuật toán TSP thứ tự điểm tối ưu
 def solve_tsp(start_coords, points):
     unvisited = points.copy()
     current_pos = start_coords
@@ -157,7 +158,7 @@ if st.sidebar.button("🚀 Tối ưu đường đi XE MÁY"):
     if not final_selected_names:
         st.warning("Vui lòng chọn hoặc upload ít nhất 1 tập điểm hợp lệ!")
     else:
-        with st.spinner("Đang tính toán lộ trình xe máy qua các con đường..."):
+        with st.spinner("Đang tính toán lộ trình xe máy..."):
             target_points = [
                 {
                     "name": name,
@@ -171,30 +172,29 @@ if st.sidebar.button("🚀 Tối ưu đường đi XE MÁY"):
                 start_coords, target_points
             )
             st.session_state.start_coords = start_coords
+            st.session_state.start_name = start_point_name
 
-# Hiển thị Bản đồ Lộ trình
+# Hiển thị Bản đồ Nền Google Maps
 if st.session_state.calculated_route is not None:
     optimized_route = st.session_state.calculated_route
     s_lat, s_lon = st.session_state.start_coords
+    s_name = st.session_state.get("start_name", "Xuất phát")
 
-    # Tổng hợp danh sách tọa độ dừng
     stopping_coords = [(s_lat, s_lon)] + [
         (p["lat"], p["lon"]) for p in optimized_route
     ]
-
-    # Lấy đường đi thực tế từ OSRM
     detailed_path, real_distance = get_route_osrm(stopping_coords)
 
     st.subheader(
         f"📊 Lộ trình xe máy tối ưu (Quãng đường thực tế ~ {real_distance:.2f} km)"
     )
 
-    # Khởi tạo bản đồ OpenStreetMap
+    # Sử dụng Google Maps Đường Phố chuẩn
     m = folium.Map(
         location=[s_lat, s_lon],
         zoom_start=14,
-        tiles="https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-        attr='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
+        attr="Google Maps",
     )
 
     # Nút định vị GPS Realtime
@@ -205,15 +205,15 @@ if st.session_state.calculated_route is not None:
         strings={"title": "Định vị vị trí của tôi"},
     ).add_to(m)
 
-    # Marker Xuất phát
+    # Marker điểm xuất phát (Đỏ)
     folium.Marker(
         [s_lat, s_lon],
-        popup="Vị trí xuất phát",
-        tooltip="Xuất phát",
+        popup=f"Xuất phát: {s_name}",
+        tooltip=f"Xuất phát: {s_name}",
         icon=folium.Icon(color="red", icon="info-sign"),
     ).add_to(m)
 
-    # Marker các điểm dừng theo thứ tự
+    # Marker các điểm đến theo thứ tự
     for idx, point in enumerate(optimized_route, start=1):
         p_lat, p_lon = point["lat"], point["lon"]
         folium.Marker(
@@ -225,13 +225,10 @@ if st.session_state.calculated_route is not None:
             ),
         ).add_to(m)
 
-    # Vẽ đường xe máy thực tế (uốn lượn theo các ngã rẽ)
+    # Đường xe máy màu đỏ nổi bật
     folium.PolyLine(
         detailed_path, color="#e63946", weight=5, opacity=0.85
     ).add_to(m)
 
-    # Tự động zoom theo toàn bộ tuyến đường
     m.fit_bounds(stopping_coords)
-
-    # Hiển thị bản đồ tràn màn hình
     st_folium(m, use_container_width=True, height=800, returned_objects=[])
