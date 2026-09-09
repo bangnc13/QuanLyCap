@@ -24,7 +24,7 @@ if os.path.exists(logo_path):
     st.sidebar.image(logo_path, use_container_width=True)
 
 # -------------------------------------------------------------
-# 2. CSS ÉP BẢN ĐỒ TRÀN MÀN HÌNH (100vh) & NÚT MENU / GPS NEON
+# 2. CSS ÉP BẢN ĐỒ TRÀN MÀN HÌNH & NÚT MENU NEON CHỚP NHÁY (BLINK)
 # -------------------------------------------------------------
 st.markdown(
     """
@@ -49,7 +49,27 @@ st.markdown(
         z-index: 99999 !important;
     }
 
-    /* NÚT MENU NEON (SIDEBAR CONTROL) */
+    /* ĐIỀU CHỈNH KEYFRAMES HIỆU ỨNG BLINK NEON */
+    @keyframes neonBlink {
+        0% {
+            background-color: #00ffcc !important;
+            box-shadow: 0 0 5px #00ffcc, 0 0 10px #00ffcc !important;
+            border-color: #00ffcc !important;
+        }
+        50% {
+            background-color: #00b386 !important;
+            box-shadow: 0 0 18px #00ffcc, 0 0 35px #00ffcc, 0 0 50px rgba(0, 255, 204, 0.9) !important;
+            border-color: #ffffff !important;
+            transform: scale(1.05);
+        }
+        100% {
+            background-color: #00ffcc !important;
+            box-shadow: 0 0 5px #00ffcc, 0 0 10px #00ffcc !important;
+            border-color: #00ffcc !important;
+        }
+    }
+
+    /* NÚT MENU NỔI BẬT VỚI HIỆU ỨNG BLINK */
     [data-testid="collapsedControl"],
     button[aria-label="Close sidebar"],
     button[aria-label="Open sidebar"] {
@@ -57,22 +77,25 @@ st.markdown(
         top: 15px !important;
         left: 15px !important;
         z-index: 999999 !important;
-        background-color: #00ffcc !important;
         border: 2px solid #00ffcc !important;
         border-radius: 50% !important;
         width: 44px !important;
         height: 44px !important;
-        box-shadow: 0 0 12px #00ffcc, 0 0 20px rgba(0, 255, 204, 0.7) !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
         cursor: pointer !important;
+        /* Áp dụng animation blink liên tục 1.5 giây */
+        animation: neonBlink 1.5s infinite ease-in-out !important;
     }
 
     [data-testid="collapsedControl"]:hover,
-    button[aria-label="Close sidebar"]:hover {
-        transform: scale(1.1) !important;
+    button[aria-label="Close sidebar"]:hover,
+    button[aria-label="Open sidebar"]:hover {
+        animation: none !important;
+        transform: scale(1.15) !important;
         background-color: #00e6b8 !important;
+        box-shadow: 0 0 25px #00ffcc, 0 0 45px #00ffcc !important;
     }
 
     [data-testid="collapsedControl"] svg,
@@ -327,7 +350,7 @@ if st.sidebar.button("🚀 Lộ trình "):
 
 
 # -------------------------------------------------------------
-# 9. HIỂN THỊ BẢN ĐỒ VIEW MAP (BIỂU TƯỢNG GPS ICON)
+# 9. HIỂN THỊ BẢN ĐỒ VIEW MAP
 # -------------------------------------------------------------
 def build_map(location, zoom=14):
     m = folium.Map(
@@ -345,7 +368,6 @@ def build_map(location, zoom=14):
         strings={"title": "Định vị vị trí của tôi"},
     ).add_to(m)
 
-    # CSS cập nhật nút GPS thành Icon SVG vị trí tròn
     custom_css = """
     <style>
     .leaflet-top.leaflet-left {
