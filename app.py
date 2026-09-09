@@ -48,21 +48,32 @@ GEOJSON_FILE = "data.geojson"
 all_points = load_geojson(GEOJSON_FILE)
 unique_keys = sorted(list(all_points.keys()))
 
-# 2. Tính năng Tìm kiếm địa điểm (Sử dụng Nominatim Geocoding - Chuẩn Google Search)
-st.sidebar.header("🔍 Tìm kiếm Điểm Kết Thúc (Đích đến)")
+# 2. Tìm kiếm Địa điểm (Giới hạn mặc định thuộc tỉnh Tuyên Quang)
+st.sidebar.header("🔍 Tìm kiếm Đích đến (Tuyên Quang)")
 search_query = st.sidebar.text_input(
-    "Nhập tên địa điểm/địa chỉ cần đến:",
-    placeholder="Ví dụ: Bệnh viện đa khoa Tuyên Quang",
+    "Nhập tên địa điểm tại Tuyên Quang:",
+    placeholder="Ví dụ: Bệnh viện đa khoa, Chợ Tam Cờ...",
 )
 
 end_location = None
 if search_query:
-    headers = {"User-Agent": "Streamlit_Route_Planner_App"}
-    url = f"https://nominatim.openstreetmap.org/search?q={search_query}&format=json&limit=5&countrycodes=vn"
+    headers = {"User-Agent": "Streamlit_TuyenQuang_Route_App"}
+    # Tự động gắn kèm 'Tuyên Quang' vào từ khóa & dùng viewbox giới hạn tọa độ Tuyên Quang
+    full_query = f"{search_query}, Tuyên Quang, Việt Nam"
+
+    # Tọa độ khung viền giới hạn tỉnh Tuyên Quang (lon_min, lat_max, lon_max, lat_min)
+    tuyen_quang_box = "104.80,22.70,105.70,21.50"
+    url = f"https://nominatim.openstreetmap.org/search?q={full_query}&format=json&limit=5&viewbox={tuyen_quang_box}&bounded=1"
 
     try:
         response = requests.get(url, headers=headers, timeout=5)
         results = response.json()
+
+        # Nếu không tìm thấy kết quả giới hạn, thử tìm rộng hơn với từ khóa + Tuyên Quang
+        if not results:
+            url_fallback = f"https://nominatim.openstreetmap.org/search?q={search_query}+Tuyên+Quang&format=json&limit=5&countrycodes=vn"
+            response = requests.get(url_fallback, headers=headers, timeout=5)
+            results = response.json()
 
         if results:
             options = {
@@ -74,7 +85,7 @@ if search_query:
                 for item in results
             }
             selected_option = st.sidebar.selectbox(
-                "Chọn chính xác địa điểm:", list(options.keys())
+                "Chọn địa điểm chính xác:", list(options.keys())
             )
             lat, lon, full_name = options[selected_option]
             end_location = {
@@ -82,16 +93,16 @@ if search_query:
                 "lat": lat,
                 "lon": lon,
             }
-            st.sidebar.success(f"📍 Đã chọn đích: {search_query}")
+            st.sidebar.success(f"📍 Đã chọn đích tại TQ: {search_query}")
         else:
-            st.sidebar.error("Không tìm thấy địa điểm! Thử gõ tên rõ hơn.")
+            st.sidebar.error("Không tìm thấy địa điểm này ở Tuyên Quang!")
     except Exception as e:
-        st.sidebar.error(f"Lỗi tìm kiếm địa điểm: {e}")
+        st.sidebar.error(f"Lỗi tìm kiếm: {e}")
 
 # 3. Chọn Danh sách tập điểm cần ghé qua (TQGP0xx)
-st.sidebar.header("📋 Danh sách tập điểm cần ghé qua (TQGP0xx)")
+st.sidebar.header("📋 Danh sách điểm ghé (TQGP0xx)")
 selected_from_list = st.sidebar.multiselect(
-    "Chọn các điểm TQGP0xx:", options=unique_keys
+    "Chọn điểm TQGP0xx:", options=unique_keys
 )
 
 uploaded_file = st.sidebar.file_uploader(
@@ -123,16 +134,14 @@ if uploaded_file:
                         if prefix_match in all_points:
                             excel_points.append(prefix_match)
 
-        st.sidebar.info(
-            f"Tìm thấy {len(excel_points)} điểm TQGP0xx từ file Excel."
-        )
+        st.sidebar.info(f"Tìm thấy {len(excel_points)} điểm TQGP0xx từ Excel.")
     except Exception as e:
         st.sidebar.error(f"Lỗi đọc file Excel: {e}")
 
 final_selected_names = list(set(selected_from_list + excel_points))
 
 
-# 4. Thuật toán OSRM & Tối ưu hóa lộ trình (Kết thúc tại điểm Search)
+# 4. Thuật toán OSRM & Tối ưu lộ trình
 def get_route_osrm(coords_list):
     formatted_coords = ";".join([f"{lon},{lat}" for lat, lon in coords_list])
     url = f"http://router.project-osrm.org/route/v1/bike/{formatted_coords}?overview=full&geometries=geojson"
@@ -155,7 +164,6 @@ def get_route_osrm(coords_list):
 
 
 def solve_tsp_with_end(start_coords, intermediate_points, end_point=None):
-    """Sắp xếp tối ưu các điểm trung gian và cố định điểm kết thúc ở cuối."""
     unvisited = intermediate_points.copy()
     current_pos = start_coords
     route = []
@@ -169,25 +177,23 @@ def solve_tsp_with_end(start_coords, intermediate_points, end_point=None):
         current_pos = (nearest["lat"], nearest["lon"])
         unvisited.remove(nearest)
 
-    # Thêm điểm kết thúc (tìm kiếm) vào cuối cùng lộ trình nếu có
     if end_point:
         route.append(end_point)
 
     return route
 
 
-# 5. Xử lý Sự kiện Bấm Button
+# 5. Xử lý nút bấm Tính toán
 if "calculated_route" not in st.session_state:
     st.session_state.calculated_route = None
 
 if st.sidebar.button("🚀 Tối ưu đường đi XE MÁY"):
     if not final_selected_names and not end_location:
         st.sidebar.warning(
-            "Vui lòng chọn ít nhất 1 điểm TQGP0xx hoặc nhập Điểm Kết Thúc!"
+            "Vui lòng chọn điểm TQGP0xx hoặc nhập Điểm Kết Thúc!"
         )
     else:
-        with st.spinner("Đang tính toán lộ trình xe máy..."):
-            # Lấy điểm đầu tiên trong danh sách làm điểm xuất phát mặc định
+        with st.spinner("Đang tính toán lộ trình xe máy tại Tuyên Quang..."):
             if final_selected_names:
                 start_name = final_selected_names[0]
                 start_coords = (
@@ -215,7 +221,7 @@ if st.sidebar.button("🚀 Tối ưu đường đi XE MÁY"):
             st.session_state.start_coords = start_coords
             st.session_state.start_name = start_name
 
-# 6. Hiển thị Lộ trình & Bản đồ Google Maps
+# 6. Display View Map
 if st.session_state.calculated_route is not None:
     optimized_route = st.session_state.calculated_route
     s_lat, s_lon = st.session_state.start_coords
@@ -226,13 +232,11 @@ if st.session_state.calculated_route is not None:
     ]
     detailed_path, real_distance = get_route_osrm(stopping_coords)
 
-    # Đưa kết quả lộ trình vào sidebar trái
     st.sidebar.markdown("---")
     st.sidebar.success(
-        f"📊 **Lộ trình xe máy tối ưu**\n\nTổng quãng đường: **~ {real_distance:.2f} km**"
+        f"📊 **Lộ trình xe máy Tuyên Quang**\n\nTổng quãng đường: **~ {real_distance:.2f} km**"
     )
 
-    # Tạo bản đồ Google Maps
     m = folium.Map(
         location=[s_lat, s_lon],
         zoom_start=14,
@@ -240,7 +244,6 @@ if st.session_state.calculated_route is not None:
         attr="Google Maps",
     )
 
-    # Nút định vị GPS Realtime
     LocateControl(
         auto_start=False,
         flyTo=True,
@@ -248,7 +251,7 @@ if st.session_state.calculated_route is not None:
         strings={"title": "Định vị vị trí của tôi"},
     ).add_to(m)
 
-    # Marker xuất phát (Màu đỏ)
+    # Xuất phát
     folium.Marker(
         [s_lat, s_lon],
         popup=f"Xuất phát: {s_name}",
@@ -256,7 +259,7 @@ if st.session_state.calculated_route is not None:
         icon=folium.Icon(color="green", icon="play"),
     ).add_to(m)
 
-    # Marker các điểm intermediate & Điểm kết thúc
+    # Các điểm dừng & Đích đến
     for idx, point in enumerate(optimized_route, start=1):
         p_lat, p_lon = point["lat"], point["lon"]
         is_end = idx == len(optimized_route) and end_location is not None
@@ -271,7 +274,6 @@ if st.session_state.calculated_route is not None:
             ),
         ).add_to(m)
 
-    # Đường xe máy màu đỏ uốn lượn
     folium.PolyLine(
         detailed_path, color="#e63946", weight=5, opacity=0.85
     ).add_to(m)
@@ -279,7 +281,7 @@ if st.session_state.calculated_route is not None:
     m.fit_bounds(stopping_coords)
     st_folium(m, use_container_width=True, height=850, returned_objects=[])
 else:
-    # Màn hình mặc định khi chưa bấm tính toán
+    # Mặc định mở trung tâm Tuyên Quang
     m_default = folium.Map(
         location=[21.82714, 105.19952],
         zoom_start=13,
