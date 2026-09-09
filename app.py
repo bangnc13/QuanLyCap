@@ -3,13 +3,16 @@ import os
 import folium
 import numpy as np
 import pandas as pd
+import requests
 import streamlit as st
 from folium.plugins import LocateControl
 from geopy.distance import geodesic
 from streamlit_folium import st_folium
 
-st.set_page_config(page_title="Tối ưu đường đi kỹ thuật", layout="wide")
-st.title("🚗 Tối ưu hóa quãng đường di chuyển")
+st.set_page_config(
+    page_title="Tối ưu đường di chuyển xe máy", layout="wide"
+)
+st.title("🏍️ Tối ưu hóa quãng đường di chuyển (Xe máy)")
 
 
 # 1. Đọc file GeoJSON
@@ -99,7 +102,36 @@ if uploaded_file:
 final_selected_names = list(set(selected_from_list + excel_points))
 
 
-# 3. Thuật toán TSP
+# 3. Hàm gọi API OSRM tìm đường giao thông thực tế (Bike / Scooter / Driving)
+def get_route_osrm(coords_list):
+    """coords_list: danh sách tuple [(lat, lon), (lat, lon),
+
+    ...] Trả về: (toàn bộ tọa độ đường đi thực tế, tổng khoảng cách km)
+    """
+    # OSRM nhận tham số dạng (lon,lat) nối nhau bằng dấu chấm phẩy
+    formatted_coords = ";".join([f"{lon},{lat}" for lat, lon in coords_list])
+    url = f"http://router.project-osrm.org/route/v1/bike/{formatted_coords}?overview=full&geometries=geojson"
+
+    try:
+        res = requests.get(url, timeout=10)
+        data = res.json()
+        if data.get("code") == "Ok":
+            route_geometry = data["routes"][0]["geometry"]["coordinates"]
+            # Chuyển từ (lon, lat) sang (lat, lon) cho Folium
+            path = [[lat, lon] for lon, lat in route_geometry]
+            distance_km = data["routes"][0]["distance"] / 1000.0
+            return path, distance_km
+    except Exception:
+        pass
+
+    # Nếu OSRM bận/lỗi, quay lại dùng đường thẳng dự phòng
+    total_dist = 0
+    for i in range(len(coords_list) - 1):
+        total_dist += geodesic(coords_list[i], coords_list[i + 1]).km
+    return [[lat, lon] for lat, lon in coords_list], total_dist
+
+
+# Thuật toán TSP thứ tự điểm tối ưu
 def solve_tsp(start_coords, points):
     unvisited = points.copy()
     current_pos = start_coords
@@ -117,51 +149,55 @@ def solve_tsp(start_coords, points):
     return route
 
 
-# 4. Lưu trạng thái Session State
+# 4. Quản lý trạng thái Session State
 if "calculated_route" not in st.session_state:
     st.session_state.calculated_route = None
 
-if st.sidebar.button("🚀 Tối ưu đường đi"):
+if st.sidebar.button("🚀 Tối ưu đường đi XE MÁY"):
     if not final_selected_names:
         st.warning("Vui lòng chọn hoặc upload ít nhất 1 tập điểm hợp lệ!")
     else:
-        target_points = [
-            {
-                "name": name,
-                "lat": all_points[name]["lat"],
-                "lon": all_points[name]["lon"],
-            }
-            for name in final_selected_names
-        ]
-        start_coords = (start_lat, start_lon)
-        st.session_state.calculated_route = solve_tsp(
-            start_coords, target_points
-        )
-        st.session_state.start_coords = start_coords
+        with st.spinner("Đang tính toán lộ trình xe máy qua các con đường..."):
+            target_points = [
+                {
+                    "name": name,
+                    "lat": all_points[name]["lat"],
+                    "lon": all_points[name]["lon"],
+                }
+                for name in final_selected_names
+            ]
+            start_coords = (start_lat, start_lon)
+            st.session_state.calculated_route = solve_tsp(
+                start_coords, target_points
+            )
+            st.session_state.start_coords = start_coords
 
-# Hiển thị Bản đồ
+# Hiển thị Bản đồ Lộ trình
 if st.session_state.calculated_route is not None:
     optimized_route = st.session_state.calculated_route
     s_lat, s_lon = st.session_state.start_coords
 
-    total_dist = 0
-    current_p = (s_lat, s_lon)
-    for p in optimized_route:
-        next_p = (p["lat"], p["lon"])
-        total_dist += geodesic(current_p, next_p).km
-        current_p = next_p
+    # Tổng hợp danh sách tọa độ dừng
+    stopping_coords = [(s_lat, s_lon)] + [
+        (p["lat"], p["lon"]) for p in optimized_route
+    ]
 
-    st.subheader(f"📊 Kết quả lộ trình (Tổng chiều dài ~ {total_dist:.2f} km)")
+    # Lấy đường đi thực tế từ OSRM
+    detailed_path, real_distance = get_route_osrm(stopping_coords)
 
-    # Sử dụng link CartoDB / OpenStreetMap công khai tải nhanh nền đường phố
+    st.subheader(
+        f"📊 Lộ trình xe máy tối ưu (Quãng đường thực tế ~ {real_distance:.2f} km)"
+    )
+
+    # Khởi tạo bản đồ OpenStreetMap
     m = folium.Map(
         location=[s_lat, s_lon],
         zoom_start=14,
-        tiles="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-        attr="&copy; OpenStreetMap contributors &copy; CARTO",
+        tiles="https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+        attr='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     )
 
-    # Thêm nút định vị GPS Realtime lên góc bản đồ
+    # Nút định vị GPS Realtime
     LocateControl(
         auto_start=False,
         flyTo=True,
@@ -169,7 +205,7 @@ if st.session_state.calculated_route is not None:
         strings={"title": "Định vị vị trí của tôi"},
     ).add_to(m)
 
-    # Marker xuất phát (Màu đỏ)
+    # Marker Xuất phát
     folium.Marker(
         [s_lat, s_lon],
         popup="Vị trí xuất phát",
@@ -177,12 +213,9 @@ if st.session_state.calculated_route is not None:
         icon=folium.Icon(color="red", icon="info-sign"),
     ).add_to(m)
 
-    route_coords = [[s_lat, s_lon]]
+    # Marker các điểm dừng theo thứ tự
     for idx, point in enumerate(optimized_route, start=1):
         p_lat, p_lon = point["lat"], point["lon"]
-        route_coords.append([p_lat, p_lon])
-
-        # Marker điểm đến có số thứ tự
         folium.Marker(
             [p_lat, p_lon],
             popup=f"Bước {idx}: {point['name']}",
@@ -192,15 +225,13 @@ if st.session_state.calculated_route is not None:
             ),
         ).add_to(m)
 
-    # Vẽ tuyến đường di chuyển (Màu xanh)
+    # Vẽ đường xe máy thực tế (uốn lượn theo các ngã rẽ)
     folium.PolyLine(
-        route_coords, color="#0055ff", weight=5, opacity=0.85
+        detailed_path, color="#e63946", weight=5, opacity=0.85
     ).add_to(m)
 
-    # Căn chỉnh view bao trọn toàn bộ các điểm
-    m.fit_bounds(route_coords)
+    # Tự động zoom theo toàn bộ tuyến đường
+    m.fit_bounds(stopping_coords)
 
-    # Mở rộng kích thước khung bản đồ (chiều cao 800px)
-    st_folium(
-        m, use_container_width=True, height=800, returned_objects=[]
-    )
+    # Hiển thị bản đồ tràn màn hình
+    st_folium(m, use_container_width=True, height=800, returned_objects=[])
