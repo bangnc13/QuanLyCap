@@ -9,6 +9,7 @@ from folium.plugins import LocateControl
 from geopy.distance import geodesic
 from streamlit_folium import st_folium
 
+# Thiết lập cấu hình trang tràn viền
 st.set_page_config(
     page_title="Tối ưu đường di chuyển xe máy",
     layout="wide",
@@ -16,48 +17,66 @@ st.set_page_config(
 )
 
 # -------------------------------------------------------------
-# 1. QUẢN LÝ TRẠNG THÁI ẨN / HIỆN SIDEBAR (SESSION STATE)
-# -------------------------------------------------------------
-if "sidebar_state" not in st.session_state:
-    st.session_state.sidebar_state = "expanded"
-
-# -------------------------------------------------------------
-# 2. CSS FULL MÀN HÌNH SÁT CẠNH TRÊN & TÙY CHỈNH NÚT NEON
+# 1. CSS ÉP BẢN ĐỒ TRÀN MÀN HÌNH (100vh) & ĐỊNH DẠNG NÚT MENU NEON
 # -------------------------------------------------------------
 st.markdown(
     """
     <style>
-    /* Xóa toàn bộ khoảng trắng padding/margin ở trên đỉnh trang */
-    .block-container {
-        padding-top: 0rem !important;
-        padding-bottom: 0rem !important;
-        padding-left: 0rem !important;
-        padding-right: 0rem !important;
-        margin-top: 0rem !important;
+    /* Xóa sạch padding, margin thừa của Streamlit */
+    html, body, [data-testid="stAppViewContainer"], .main, .block-container {
+        padding: 0 !important;
+        margin: 0 !important;
+        height: 100vh !important;
+        overflow: hidden !important;
     }
     
+    /* Mở rộng container chứa bản đồ full 100% chiều cao */
+    [data-testid="stVerticalBlock"] {
+        gap: 0rem !important;
+    }
+    
+    /* Hide Header mặc định của Streamlit để đụng trần sát mép trên */
     header[data-testid="stHeader"] {
+        height: 0px !important;
         background: transparent !important;
         z-index: 99999 !important;
     }
 
-    /* Bo tròn & tô màu Xanh Neon cho nút ẩn/mở mặc định ở góc trên trái */
-    button[aria-label="Close sidebar"], 
-    button[aria-label="Open sidebar"],
-    [data-testid="collapsedControl"] button {
+    /* Đội lốt nút ẩn/mở Sidebar gốc của Streamlit (nút '>>' / '<<') 
+       thành NÚT 3 GẠCH BO TRÒN MÀU XANH NEON */
+    [data-testid="collapsedControl"],
+    button[aria-label="Close sidebar"],
+    button[aria-label="Open sidebar"] {
+        position: fixed !important;
+        top: 15px !important;
+        left: 15px !important;
+        z-index: 999999 !important;
         background-color: #00ffcc !important;
-        color: #000000 !important;
-        border-radius: 50% !important;
         border: 2px solid #00ffcc !important;
-        box-shadow: 0 0 12px #00ffcc, 0 0 20px rgba(0, 255, 204, 0.6) !important;
-        width: 42px !important;
-        height: 42px !important;
+        border-radius: 50% !important;
+        width: 44px !important;
+        height: 44px !important;
+        box-shadow: 0 0 12px #00ffcc, 0 0 20px rgba(0, 255, 204, 0.7) !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        cursor: pointer !important;
     }
 
+    [data-testid="collapsedControl"]:hover,
+    button[aria-label="Close sidebar"]:hover {
+        transform: scale(1.1) !important;
+        background-color: #00e6b8 !important;
+    }
+
+    /* Đổi icon bên trong thành biểu tượng sắc nét */
     [data-testid="collapsedControl"] svg,
-    button[aria-label="Close sidebar"] svg {
+    button[aria-label="Close sidebar"] svg,
+    button[aria-label="Open sidebar"] svg {
         fill: #000000 !important;
         color: #000000 !important;
+        width: 22px !important;
+        height: 22px !important;
     }
     </style>
     """,
@@ -68,7 +87,7 @@ st.markdown(
 st.sidebar.title("🏍️ Tối ưu hóa quãng đường di chuyển (Xe máy)")
 
 # -------------------------------------------------------------
-# 3. BỘ LẤY TỌA ĐỘ GPS REALTIME TỪ ĐIỆN THOẠI
+# 2. BỘ LẤY TỌA ĐỘ GPS REALTIME TỪ ĐIỆN THOẠI
 # -------------------------------------------------------------
 st.sidebar.header("📍 Điểm xuất phát (GPS Điện thoại)")
 
@@ -108,7 +127,7 @@ st.sidebar.success(
 
 
 # -------------------------------------------------------------
-# 4. ĐỌC GEOJSON LỌC TQGP0xx
+# 3. ĐỌC GEOJSON LỌC TQGP0xx
 # -------------------------------------------------------------
 @st.cache_data
 def load_geojson(file_path):
@@ -143,7 +162,7 @@ unique_keys = sorted(list(all_points.keys()))
 
 
 # -------------------------------------------------------------
-# 5. TÌM KIẾM ĐẮM ĐẾN (TUYÊN QUANG)
+# 4. TÌM KIẾM ĐẮM ĐẾN (TUYÊN QUANG)
 # -------------------------------------------------------------
 st.sidebar.header("🔍 Tìm kiếm Đích đến (Tuyên Quang)")
 search_query = st.sidebar.text_input(
@@ -193,7 +212,7 @@ if search_query:
 
 
 # -------------------------------------------------------------
-# 6. DANH SÁCH ĐIỂM CẦN GHÉ QUA (TQGP0xx)
+# 5. DANH SÁCH ĐIỂM CẦN GHÉ QUA (TQGP0xx)
 # -------------------------------------------------------------
 st.sidebar.header("📋 Danh sách điểm ghé (TQGP0xx)")
 selected_from_list = st.sidebar.multiselect(
@@ -237,7 +256,7 @@ final_selected_names = list(set(selected_from_list + excel_points))
 
 
 # -------------------------------------------------------------
-# 7. THUẬT TOÁN OSRM VÀ ĐIỀU HƯỚNG
+# 6. THUẬT TOÁN OSRM VÀ ĐIỀU HƯỚNG
 # -------------------------------------------------------------
 def get_route_osrm(coords_list):
     formatted_coords = ";".join([f"{lon},{lat}" for lat, lon in coords_list])
@@ -281,7 +300,7 @@ def solve_tsp_from_gps(gps_coords, intermediate_points, end_point=None):
 
 
 # -------------------------------------------------------------
-# 8. XỬ LÝ NÚT TÍNH TOÁN
+# 7. XỬ LÝ NÚT TÍNH TOÁN
 # -------------------------------------------------------------
 if "calculated_route" not in st.session_state:
     st.session_state.calculated_route = None
@@ -311,7 +330,7 @@ if st.sidebar.button("🚀 Tối ưu đường đi XE MÁY"):
 
 
 # -------------------------------------------------------------
-# 9. HIỂN THỊ BẢN ĐỒ VIEW MAP FULL-SCREEN
+# 8. HIỂN THỊ BẢN ĐỒ VIEW MAP (FULL 100vh TRÀN VIỀN)
 # -------------------------------------------------------------
 def build_map(location, zoom=14):
     m = folium.Map(
@@ -374,7 +393,8 @@ if st.session_state.calculated_route is not None:
     ).add_to(m)
 
     m.fit_bounds(stopping_coords)
-    st_folium(m, use_container_width=True, height=920, returned_objects=[])
+    # 100vh ép bản đồ tràn kín màn hình trên & dưới
+    st_folium(m, use_container_width=True, height=1000, returned_objects=[])
 else:
     m_default = build_map([curr_lat, curr_lon], zoom=14)
     folium.Marker(
@@ -385,5 +405,5 @@ else:
     ).add_to(m_default)
 
     st_folium(
-        m_default, use_container_width=True, height=920, returned_objects=[]
+        m_default, use_container_width=True, height=1000, returned_objects=[]
     )
