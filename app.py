@@ -17,7 +17,14 @@ st.set_page_config(
 )
 
 # -------------------------------------------------------------
-# 1. CSS ÉP BẢN ĐỒ TRÀN MÀN HÌNH (100vh) & NÚT MENU / GPS NEON
+# 1. BỔ SUNG LOGO VÀO ĐẦU SIDEBAR (TRÊN CÙNG MENU)
+# -------------------------------------------------------------
+logo_path = "FPT_Telecom_logo.png"
+if os.path.exists(logo_path):
+    st.sidebar.image(logo_path, use_container_width=True)
+
+# -------------------------------------------------------------
+# 2. CSS ÉP BẢN ĐỒ TRÀN MÀN HÌNH (100vh) & NÚT MENU / GPS NEON
 # -------------------------------------------------------------
 st.markdown(
     """
@@ -117,14 +124,10 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Sidebar Title
-st.sidebar.title("🏍️ Tối ưu hóa quãng đường di chuyển (Xe máy)")
 
 # -------------------------------------------------------------
-# 2. BỘ LẤY TỌA ĐỘ GPS REALTIME TỪ ĐIỆN THOẠI
+# 3. BỘ LẤY TỌA ĐỘ GPS REALTIME TỪ ĐIỆN THOẠI (CHẠY NGẦM)
 # -------------------------------------------------------------
-st.sidebar.header("📍 Điểm xuất phát (GPS Điện thoại)")
-
 gps_code = """
 <script>
 if (navigator.geolocation) {
@@ -155,13 +158,9 @@ if gps_data and isinstance(gps_data, dict) and "lat" in gps_data:
 curr_lat = st.session_state.user_gps["lat"]
 curr_lon = st.session_state.user_gps["lon"]
 
-st.sidebar.success(
-    f"📡 **Đã định vị GPS điện thoại:**\n\nLat: `{curr_lat:.5f}` | Lon: `{curr_lon:.5f}`"
-)
-
 
 # -------------------------------------------------------------
-# 3. ĐỌC GEOJSON LỌC TQGP0xx
+# 4. ĐỌC GEOJSON LỌC TQGP0xx
 # -------------------------------------------------------------
 @st.cache_data
 def load_geojson(file_path):
@@ -196,7 +195,7 @@ unique_keys = sorted(list(all_points.keys()))
 
 
 # -------------------------------------------------------------
-# 4. TÌM KIẾM ĐÍCH ĐẾN (TUYÊN QUANG)
+# 5. TÌM KIẾM ĐÍCH ĐẾN (TUYÊN QUANG)
 # -------------------------------------------------------------
 st.sidebar.header("🔍 Tìm kiếm Đích đến (Tuyên Quang)")
 search_query = st.sidebar.text_input(
@@ -246,7 +245,7 @@ if search_query:
 
 
 # -------------------------------------------------------------
-# 5. DANH SÁCH ĐIỂM CẦN GHÉ QUA (TQGP0xx)
+# 6. DANH SÁCH ĐIỂM CẦN GHÉ QUA (TQGP0xx)
 # -------------------------------------------------------------
 st.sidebar.header("📋 Danh sách điểm ghé (TQGP0xx)")
 selected_from_list = st.sidebar.multiselect(
@@ -290,7 +289,7 @@ final_selected_names = list(set(selected_from_list + excel_points))
 
 
 # -------------------------------------------------------------
-# 6. THUẬT TOÁN OSRM VÀ ĐIỀU HƯỚNG
+# 7. THUẬT TOÁN OSRM VÀ ĐIỀU HƯỚNG
 # -------------------------------------------------------------
 def get_route_osrm(coords_list):
     formatted_coords = ";".join([f"{lon},{lat}" for lat, lon in coords_list])
@@ -334,7 +333,7 @@ def solve_tsp_from_gps(gps_coords, intermediate_points, end_point=None):
 
 
 # -------------------------------------------------------------
-# 7. XỬ LÝ NÚT TÍNH TOÁN
+# 8. XỬ LÝ NÚT TÍNH TOÁN
 # -------------------------------------------------------------
 if "calculated_route" not in st.session_state:
     st.session_state.calculated_route = None
@@ -364,7 +363,7 @@ if st.sidebar.button("🚀 Tối ưu đường đi XE MÁY"):
 
 
 # -------------------------------------------------------------
-# 8. HIỂN THỊ BẢN ĐỒ VIEW MAP (FULL 100vh TRÀN VIỀN)
+# 9. HIỂN THỊ BẢN ĐỒ VIEW MAP (FULL 100vh TRÀN VIỀN)
 # -------------------------------------------------------------
 def build_map(location, zoom=14):
     m = folium.Map(
