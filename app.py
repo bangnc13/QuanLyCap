@@ -338,7 +338,7 @@ def solve_tsp_from_gps(gps_coords, intermediate_points, end_point=None):
 if "calculated_route" not in st.session_state:
     st.session_state.calculated_route = None
 
-if st.sidebar.button("🚀 Tối ưu đường đi XE MÁY"):
+if st.sidebar.button("🚀 Lộ trình "):
     if not final_selected_names and not end_location:
         st.sidebar.warning(
             "Vui lòng chọn điểm TQGP0xx hoặc nhập Điểm Kết Thúc!"
