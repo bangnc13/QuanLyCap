@@ -24,7 +24,7 @@ if os.path.exists(logo_path):
     st.sidebar.image(logo_path, use_container_width=True)
 
 # -------------------------------------------------------------
-# 2. CSS ÉP BẢN ĐỒ TRÀN MÀN HÌNH & HIỆU ỨNG BLINK CHO CẢ 2 TRẠNG THÁI (ĐÓNG/MỞ)
+# 2. CSS BẮT BỘC NHẤP NHÁY NÚT OPEN SIDEBAR (>> ON MAP) & CLOSE SIDEBAR (<<)
 # -------------------------------------------------------------
 st.markdown(
     """
@@ -37,91 +37,90 @@ st.markdown(
         overflow: hidden !important;
     }
     
-    /* Mở rộng container chứa bản đồ full 100% chiều cao */
     [data-testid="stVerticalBlock"] {
         gap: 0rem !important;
     }
     
-    /* Hide Header mặc định của Streamlit */
     header[data-testid="stHeader"] {
         height: 0px !important;
         background: transparent !important;
         z-index: 99999 !important;
     }
 
-    /* KEYFRAMES TẠO HIỆU ỨNG BLINK PHÁT SÁNG NEON */
-    @keyframes blinkGlow {
+    /* ĐỊNH NGHĨA KEYFRAME CHỚP NHÁY BLINK SIÊU MẠNH */
+    @keyframes neonBlinkGlow {
         0% {
             background-color: #00ffcc !important;
-            box-shadow: 0 0 8px #00ffcc, 0 0 15px #00ffcc !important;
-            border-color: #00ffcc !important;
+            box-shadow: 0 0 10px #00ffcc, 0 0 20px #00ffcc !important;
+            border: 2px solid #00ffcc !important;
             transform: scale(1);
         }
         50% {
-            background-color: #00e6b8 !important;
-            box-shadow: 0 0 25px #00ffcc, 0 0 40px #00ffcc, 0 0 60px #00ffcc !important;
-            border-color: #ffffff !important;
-            transform: scale(1.1);
+            background-color: #00b386 !important;
+            box-shadow: 0 0 25px #00ffcc, 0 0 45px #00ffcc, 0 0 65px #00ffcc !important;
+            border: 2px solid #ffffff !important;
+            transform: scale(1.15);
         }
         100% {
             background-color: #00ffcc !important;
-            box-shadow: 0 0 8px #00ffcc, 0 0 15px #00ffcc !important;
-            border-color: #00ffcc !important;
+            box-shadow: 0 0 10px #00ffcc, 0 0 20px #00ffcc !important;
+            border: 2px solid #00ffcc !important;
             transform: scale(1);
         }
     }
 
-    /* 1. HIỆU ỨNG CHO NÚT KHI MENU ĐANG ĐÓNG (NÚT >> TRÊN BẢN ĐỒ) */
+    /* ÉP TẤT CẢ BIẾN THỂ NÚT MỞ SIDEBAR (NÚT >> NẰM TRÊN BẢN ĐỒ) */
+    [data-testid="collapsedControl"],
     [data-testid="stSidebarCollapsedControl"],
     [data-testid="stSidebarCollapsedControl"] button,
-    div[data-testid="collapsedControl"] {
+    button[aria-label="Open sidebar"],
+    section[data-testid="stSidebar"] + button,
+    div[class*="collapsedControl"] {
         position: fixed !important;
-        top: 15px !important;
-        left: 15px !important;
-        z-index: 9999999 !important;
+        top: 14px !important;
+        left: 14px !important;
+        z-index: 99999999 !important;
         background-color: #00ffcc !important;
-        border: 2px solid #00ffcc !important;
         border-radius: 50% !important;
-        width: 46px !important;
-        height: 46px !important;
+        width: 44px !important;
+        height: 44px !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
         cursor: pointer !important;
-        animation: blinkGlow 1.2s infinite ease-in-out !important;
+        animation: neonBlinkGlow 1.2s infinite ease-in-out !important;
     }
 
-    /* 2. HIỆU ỨNG CHO NÚT KHI MENU ĐANG MỞ (NÚT << TRONG SIDEBAR) */
+    /* NÚT ĐÓNG SIDEBAR (NÚT << NẰM TRONG MENU) */
     div[data-testid="stSidebarCollapseButton"] button,
-    button[aria-label="Close sidebar"],
-    button[aria-label="Open sidebar"] {
+    button[aria-label="Close sidebar"] {
         background-color: #00ffcc !important;
-        border: 2px solid #00ffcc !important;
         border-radius: 50% !important;
-        width: 46px !important;
-        height: 46px !important;
+        width: 44px !important;
+        height: 44px !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
         cursor: pointer !important;
-        animation: blinkGlow 1.2s infinite ease-in-out !important;
+        animation: neonBlinkGlow 1.2s infinite ease-in-out !important;
     }
 
-    /* BẮT BÚOC ICON BÊN TRONG NÚT LÀ MÀU ĐEN VÀ CÓ KÍCH THƯỚC CHUẨN */
+    /* ÉP ĐỔI MÀU ICON SVG BÊN TRONG THÀNH MÀU ĐEN CHO RÕ NÉT */
+    [data-testid="collapsedControl"] svg,
     [data-testid="stSidebarCollapsedControl"] svg,
-    div[data-testid="stSidebarCollapseButton"] svg,
-    button[aria-label="Close sidebar"] svg,
-    button[aria-label="Open sidebar"] svg {
+    button[aria-label="Open sidebar"] svg,
+    button[aria-label="Close sidebar"] svg {
         fill: #000000 !important;
         color: #000000 !important;
         stroke: #000000 !important;
-        width: 24px !important;
-        height: 24px !important;
+        width: 22px !important;
+        height: 22px !important;
     }
     </style>
     """,
     unsafe_allow_html=True,
 )
+
 
 # -------------------------------------------------------------
 # 3. BỘ LẤY TỌA ĐỘ GPS REALTIME TỪ ĐIỆN THOẠI (CHẠY NGẦM)
@@ -361,7 +360,7 @@ if st.sidebar.button("🚀 Lộ trình "):
 
 
 # -------------------------------------------------------------
-# 9. HIỂN THỊ BẢN ĐỒ VIEW MAP
+# 9. HIỂN THỊ BẢN ĐỒ VIEW MAP (CÓ INJECT JS/CSS ÉP PARENT DONG NÚT)
 # -------------------------------------------------------------
 def build_map(location, zoom=14):
     m = folium.Map(
@@ -379,7 +378,8 @@ def build_map(location, zoom=14):
         strings={"title": "Định vị vị trí của tôi"},
     ).add_to(m)
 
-    custom_css = """
+    # CSS + JavaScript Inject từ trong IFRAME ra ngoài trang PARENT để buộc nút '>>' phải nhấp nháy
+    custom_script = """
     <style>
     .leaflet-top.leaflet-left {
         top: 75px !important;
@@ -407,8 +407,25 @@ def build_map(location, zoom=14):
         background-size: contain !important;
     }
     </style>
+    <script>
+    // JS Injection liên tục quét và add class nhấp nháy vào nút '>>' ngoài Streamlit
+    setInterval(function() {
+        try {
+            var parentDoc = window.parent.document;
+            var openBtn = parentDoc.querySelector('[data-testid="collapsedControl"]') || 
+                          parentDoc.querySelector('[data-testid="stSidebarCollapsedControl"]') ||
+                          parentDoc.querySelector('button[aria-label="Open sidebar"]');
+            if (openBtn) {
+                openBtn.style.setProperty('animation', 'neonBlinkGlow 1.2s infinite ease-in-out', 'important');
+                openBtn.style.setProperty('background-color', '#00ffcc', 'important');
+                openBtn.style.setProperty('border-radius', '50%', 'important');
+                openBtn.style.setProperty('border', '2px solid #00ffcc', 'important');
+            }
+        } catch(e) {}
+    }, 500);
+    </script>
     """
-    m.get_root().html.add_child(folium.Element(custom_css))
+    m.get_root().html.add_child(folium.Element(custom_script))
 
     return m
 
