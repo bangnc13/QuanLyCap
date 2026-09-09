@@ -17,7 +17,7 @@ st.set_page_config(
 )
 
 # -------------------------------------------------------------
-# 1. CSS ÉP BẢN ĐỒ TRÀN MÀN HÌNH (100vh) & ĐỊNH DẠNG NÚT MENU NEON
+# 1. CSS ÉP BẢN ĐỒ TRÀN MÀN HÌNH (100vh) & NÚT MENU / GPS NEON
 # -------------------------------------------------------------
 st.markdown(
     """
@@ -35,15 +35,14 @@ st.markdown(
         gap: 0rem !important;
     }
     
-    /* Hide Header mặc định của Streamlit để đụng trần sát mép trên */
+    /* Hide Header mặc định của Streamlit */
     header[data-testid="stHeader"] {
         height: 0px !important;
         background: transparent !important;
         z-index: 99999 !important;
     }
 
-    /* Đội lốt nút ẩn/mở Sidebar gốc của Streamlit (nút '>>' / '<<') 
-       thành NÚT 3 GẠCH BO TRÒN MÀU XANH NEON */
+    /* NÚT MENU NEON (SIDEBAR CONTROL) */
     [data-testid="collapsedControl"],
     button[aria-label="Close sidebar"],
     button[aria-label="Open sidebar"] {
@@ -69,7 +68,6 @@ st.markdown(
         background-color: #00e6b8 !important;
     }
 
-    /* Đổi icon bên trong thành biểu tượng sắc nét */
     [data-testid="collapsedControl"] svg,
     button[aria-label="Close sidebar"] svg,
     button[aria-label="Open sidebar"] svg {
@@ -77,6 +75,42 @@ st.markdown(
         color: #000000 !important;
         width: 22px !important;
         height: 22px !important;
+    }
+
+    /* NÚT LOCATE CONTROL (GPS NEON) */
+    .leaflet-control-locate a {
+        background-color: #00ffcc !important;
+        border: 2px solid #00ffcc !important;
+        border-radius: 50% !important;
+        width: 44px !important;
+        height: 44px !important;
+        line-height: 40px !important;
+        box-shadow: 0 0 12px #00ffcc, 0 0 20px rgba(0, 255, 204, 0.7) !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        text-decoration: none !important;
+        transition: transform 0.2s ease !important;
+    }
+
+    .leaflet-control-locate a:hover {
+        transform: scale(1.1) !important;
+        background-color: #00e6b8 !important;
+    }
+
+    /* Ẩn icon mặc định của plugin LocateControl */
+    .leaflet-control-locate a span {
+        display: none !important;
+    }
+
+    /* Chèn chữ GPS vào bên trong nút */
+    .leaflet-control-locate a::after {
+        content: "GPS" !important;
+        font-weight: 900 !important;
+        font-size: 13px !important;
+        color: #000000 !important;
+        font-family: sans-serif !important;
+        letter-spacing: 0.5px !important;
     }
     </style>
     """,
@@ -367,7 +401,6 @@ if st.session_state.calculated_route is not None:
 
     m = build_map([s_lat, s_lon], zoom=14)
 
-    # Đã xóa tooltip tại đây
     folium.Marker(
         [s_lat, s_lon],
         popup="Vị trí GPS của bạn (Xuất phát)",
@@ -393,11 +426,10 @@ if st.session_state.calculated_route is not None:
     ).add_to(m)
 
     m.fit_bounds(stopping_coords)
-    # 100vh ép bản đồ tràn kín màn hình trên & dưới
     st_folium(m, use_container_width=True, height=1000, returned_objects=[])
 else:
     m_default = build_map([curr_lat, curr_lon], zoom=14)
-    # Đã xóa tooltip tại đây
+
     folium.Marker(
         [curr_lat, curr_lon],
         popup="Vị trí hiện tại của bạn",
