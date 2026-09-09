@@ -83,47 +83,6 @@ st.markdown(
         width: 22px !important;
         height: 22px !important;
     }
-
-    /* DỊCH CHUYỂN TOÀN BỘ CỤM NÚT CỦA LEAFLET GÓC TRÊN BÊN TRÁI (+, -, GPS) XUỐNG DƯỚI */
-    .leaflet-top.leaflet-left {
-        top: 120px !important;
-    }
-
-    /* NÚT LOCATE CONTROL (GPS NEON) */
-    .leaflet-control-locate a {
-        background-color: #00ffcc !important;
-        border: 2px solid #00ffcc !important;
-        border-radius: 50% !important;
-        width: 44px !important;
-        height: 44px !important;
-        line-height: 40px !important;
-        box-shadow: 0 0 12px #00ffcc, 0 0 20px rgba(0, 255, 204, 0.7) !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        text-decoration: none !important;
-        transition: transform 0.2s ease !important;
-    }
-
-    .leaflet-control-locate a:hover {
-        transform: scale(1.1) !important;
-        background-color: #00e6b8 !important;
-    }
-
-    /* Ẩn icon mặc định của plugin LocateControl */
-    .leaflet-control-locate a span {
-        display: none !important;
-    }
-
-    /* Chèn chữ GPS vào bên trong nút */
-    .leaflet-control-locate a::after {
-        content: "GPS" !important;
-        font-weight: 900 !important;
-        font-size: 13px !important;
-        color: #000000 !important;
-        font-family: sans-serif !important;
-        letter-spacing: 0.5px !important;
-    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -368,16 +327,58 @@ if st.sidebar.button("🚀 Lộ trình "):
 
 
 # -------------------------------------------------------------
-# 9. HIỂN THỊ BẢN ĐỒ VIEW MAP (FULL 100vh TRÀN VIỀN)
+# 9. HIỂN THỊ BẢN ĐỒ VIEW MAP (TẮT ZOOM MẶC ĐỊNH & DỊCH NÚT XUỐNG)
 # -------------------------------------------------------------
 def build_map(location, zoom=14):
+    # Tắt zoom_control mặc định của Folium
     m = folium.Map(
         location=location,
         zoom_start=zoom,
         tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
         attr="Google Maps",
-        zoom_control=True,
+        zoom_control=False,
     )
+
+    # Thêm lại ZoomControl với vị trí đẩy xuống dưới (topleft với CSS tùy chỉnh trực tiếp vào iframe)
+    folium.plugins.FloatImage(
+        "https://upload.wikimedia.org/wikipedia/commons/1/10/Blank_pixel.png",
+        bottom=0,
+        left=0,
+    ).add_to(m)
+
+    # Inject CSS trực tiếp vào Iframe bản đồ để đẩy toàn bộ nút xuống 80px
+    custom_css = """
+    <style>
+    .leaflet-top.leaflet-left {
+        top: 80px !important;
+    }
+    .leaflet-control-locate a {
+        background-color: #00ffcc !important;
+        border: 2px solid #00ffcc !important;
+        border-radius: 50% !important;
+        width: 44px !important;
+        height: 44px !important;
+        line-height: 40px !important;
+        box-shadow: 0 0 12px #00ffcc, 0 0 20px rgba(0, 255, 204, 0.7) !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        text-decoration: none !important;
+    }
+    .leaflet-control-locate a span { display: none !important; }
+    .leaflet-control-locate a::after {
+        content: "GPS" !important;
+        font-weight: 900 !important;
+        font-size: 13px !important;
+        color: #000000 !important;
+        font-family: sans-serif !important;
+    }
+    </style>
+    """
+    m.get_root().html.add_child(folium.Element(custom_css))
+
+    # Tự tạo nút Zoom tay để đặt đúng vị trí mong muốn
+    folium.control.ZoomControl(position="topleft").add_to(m)
 
     LocateControl(
         auto_start=False,
