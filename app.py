@@ -197,9 +197,9 @@ unique_keys = sorted(list(all_points.keys()))
 # -------------------------------------------------------------
 # 5. TÌM KIẾM ĐÍCH ĐẾN (TUYÊN QUANG)
 # -------------------------------------------------------------
-st.sidebar.header("🔍 Tìm kiếm Đích đến (Tuyên Quang)")
+st.sidebar.header(" Make by BangNC13")
 search_query = st.sidebar.text_input(
-    "Nhập địa điểm đích đến:",
+    "Nhập điểm cuối hành trình",
     placeholder="Ví dụ: Bệnh viện đa khoa, Chợ Tam Cờ...",
 )
 
