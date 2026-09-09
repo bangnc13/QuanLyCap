@@ -1,602 +1,195 @@
-import os
 import json
+import re
+import folium
+import numpy as np
 import pandas as pd
-import networkx as nx
 import streamlit as st
-import streamlit.components.v1 as components
+from geopy.distance import geodesic
+from streamlit_folium import st_folium
+from streamlit_js_eval import get_geolocation
 
-# 1. Cấu hình trang Streamlit
+# ----------------------------------------------------
+# 1. Cấu hình giao diện Streamlit
+# ----------------------------------------------------
 st.set_page_config(
-    page_title="Xác Định Vị Trí Đứt Cáp - BangNC13", 
-    layout="wide", 
-    initial_sidebar_state="expanded"
+    page_title="Tối ưu đường đi kỹ thuật", layout="wide"
+)
+st.title("🚗 Tối ưu hóa quãng đường di chuyển")
+
+
+# ----------------------------------------------------
+# 2. Thuật toán giải quyết bài toán TSP (Gần nhất - Nearest Neighbor)
+# ----------------------------------------------------
+def solve_tsp(start_coords, points_coords):
+    """
+    start_coords: (lat, lon) vị trí xuất phát
+    points_coords: danh sách dict [{'name': str, 'lat': float, 'lon': float}]
+    """
+    unvisited = points_coords.copy()
+    current_pos = start_coords
+    route = []
+
+    while unvisited:
+        # Tìm điểm gần vị trí hiện tại nhất
+        nearest = min(
+            unvisited,
+            key=lambda p: geodesic(current_pos, (p["lat"], p["lon"])).km,
+        )
+        route.append(nearest)
+        current_pos = (nearest["lat"], nearest["lon"])
+        unvisited.remove(nearest)
+
+    return route
+
+
+# ----------------------------------------------------
+# 3. Tải và xử lý dữ liệu GeoJSON
+# ----------------------------------------------------
+@st.cache_data
+def load_geojson(file_path):
+    with open(file_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    points = {}
+    for feature in data.get("features", []):
+        props = feature.get("properties", {})
+        geom = feature.get("geometry", {})
+
+        name = props.get("name", "")
+        # Lọc danh sách tập điểm có dạng TQGP... hoặc TQGM...
+        if name and geom.get("type") == "Point":
+            coords = geom.get("coordinates", [])
+            if len(coords) >= 2:
+                points[name] = {
+                    "lat": coords[1],
+                    "lon": coords[0],
+                    "id": props.get("id"),
+                }
+    return points
+
+
+# Nhập đường dẫn file GeoJSON gốc trên hệ thống
+GEOJSON_FILE = "data.geojson"
+try:
+    all_points = load_geojson(GEOJSON_FILE)
+except Exception as e:
+    st.error(f"Chưa tìm thấy file {GEOJSON_FILE} hoặc lỗi đọc file GeoJSON!")
+    all_points = {}
+
+# ----------------------------------------------------
+# 4. Giao diện Sidebar: Lấy vị trí GPS & Chọn danh sách điểm
+# ----------------------------------------------------
+st.sidebar.header("📍 Vị trí GPS xuất phát")
+location = get_geolocation()
+
+start_lat, start_lon = None, None
+if location and "coords" in location:
+    start_lat = location["coords"]["latitude"]
+    start_lon = location["coords"]["longitude"]
+    st.sidebar.success(f"GPS: {start_lat:.5f}, {start_lon:.5f}")
+else:
+    st.sidebar.warning(
+        "Chưa nhận được vị trí GPS từ điện thoại. Vui lòng bật định vị trình duyệt."
+    )
+    # Vị trí mặc định (Ví dụ Tuyên Quang)
+    start_lat = st.sidebar.number_input("Nhập Lat xuất phát", value=21.8181)
+    start_lon = st.sidebar.number_input("Nhập Lon xuất phát", value=105.2073)
+
+st.sidebar.header("📋 Danh sách tập điểm cần đến")
+
+# Mục 1: Chọn từ ô Dropdown/Multiselect
+selected_from_list = st.sidebar.multiselect(
+    "Chọn điểm từ tập dữ liệu:", options=list(all_points.keys())
 )
 
-# CSS Tùy chỉnh giao diện Fullscreen & Sidebar
-st.markdown("""
-    <style>
-        html, body, [data-testid="stAppViewContainer"], .main, .stApp {
-            margin: 0 !important;
-            padding: 0 !important;
-            height: 100vh !important;
-            overflow: hidden !important;
-        }
+# Mục 2: Import file Excel danh sách cần chọn
+uploaded_file = st.sidebar.file_uploader(
+    "Hoặc Upload file Excel chứa cột danh sách điểm:", type=["xlsx", "xls"]
+)
+excel_points = []
+if uploaded_file:
+    try:
+        df = pd.read_excel(uploaded_file)
+        # Lấy toàn bộ giá trị text trong file Excel có định dạng dạng TQ...
+        raw_text = " ".join(df.astype(str).values.flatten())
+        # Tìm các mã dạng TQGP... hoặc TQGM... bằng Regex
+        matched_names = re.findall(r"TQ[A-Z0-9\.\/]+", raw_text)
+        excel_points = [p for p in matched_names if p in all_points]
+        st.sidebar.info(f"Tìm thấy {len(excel_points)} điểm hợp lệ từ Excel.")
+    except Exception as e:
+        st.sidebar.error(f"Lỗi đọc file Excel: {e}")
 
-        section[data-testid="stSidebar"] {
-            z-index: 999999 !important;
-        }
-        section[data-testid="stSidebar"] > div:first-child {
-            padding-top: 1.5rem !important;
-            padding-left: 1rem !important;
-            padding-right: 1rem !important;
-        }
+# Tổng hợp danh sách điểm cần di chuyển
+final_selected_names = list(set(selected_from_list + excel_points))
 
-        .sidebar-title {
-            font-size: 1.15rem !important;
-            font-weight: 700 !important;
-            color: #1F2937 !important;
-            margin-bottom: 2px !important;
-        }
-        .sidebar-subtitle {
-            font-size: 0.8rem !important;
-            color: #6B7280 !important;
-            margin-bottom: 12px !important;
-        }
-
-        header[data-testid="stHeader"] {
-            background: transparent !important;
-            height: 0px !important;
-            z-index: 999999 !important;
-        }
-
-        .main .block-container, 
-        [data-testid="stMainBlockContainer"],
-        [data-testid="stVerticalBlock"],
-        [data-testid="stVerticalBlockBorderWrapper"] {
-            padding: 0 !important;
-            margin: 0 !important;
-            gap: 0rem !important;
-            max-width: 100vw !important;
-            height: 100vh !important;
-        }
-
-        iframe {
-            width: 100vw !important;
-            height: 100vh !important;
-            border: none !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            display: block !important;
-        }
-    </style>
-""", unsafe_allow_html=True)
-
-# Khởi tạo session state
-if "break_result" not in st.session_state: 
-    st.session_state.break_result = None 
-if "break_gps" not in st.session_state: 
-    st.session_state.break_gps = None 
-
-@st.cache_data 
-def load_server_data(): 
-    possible_files = [ 
-        "Danh-Sách-Đoạn-Cáp.xlsx",  
-        "Danh_Sach_Doan_Cap.xlsx",  
-        "data.xlsx",  
-        "Danh-Sách-Đoạn-Cáp.xls" 
-    ] 
-    
-    selected_file = None 
-    for f in possible_files: 
-        if os.path.exists(f): 
-            selected_file = f 
-            break 
-
-    if not selected_file: 
-        files = [f for f in os.listdir(".") if f.endswith(".xlsx") or f.endswith(".xls")] 
-        if files: 
-            selected_file = files[0] 
-
-    if selected_file: 
-        df = pd.read_excel(selected_file) 
-        return df, selected_file 
-    return None, None 
-
-df, file_name = load_server_data() 
-
-st.sidebar.markdown('<div class="sidebar-title">⚡ TQG-XÁC ĐỊNH VỊ TRÍ ĐỨT CÁP</div>', unsafe_allow_html=True)
-st.sidebar.markdown('<div class="sidebar-subtitle"></div>', unsafe_allow_html=True)
-
-if df is not None: 
-    st.sidebar.success(f"Make by BangNC13") 
-    
-    df.columns = [str(col).strip() for col in df.columns] 
-    
-    lat_col1 = next((c for c in df.columns if 'lat' in c.lower() and '1' in c.lower()), None) 
-    lon_col1 = next((c for c in df.columns if 'lng' in c.lower() or ('lon' in c.lower() and '1' in c.lower())), None) 
-    lat_col2 = next((c for c in df.columns if 'lat' in c.lower() and '2' in c.lower()), None) 
-    lon_col2 = next((c for c in df.columns if 'lng' in c.lower() or ('lon' in c.lower() and '2' in c.lower())), None) 
-
-    if not lat_col1: 
-        lat_col1 = next((c for c in df.columns if 'lat' in c.lower() or 'vĩ độ' in c.lower()), None) 
-        lon_col1 = next((c for c in df.columns if 'lng' in c.lower() or 'lon' in c.lower() or 'kinh độ' in c.lower()), None) 
-
-    if 'Tên đoạn cáp' in df.columns: 
-        df['POP'] = df['Tên đoạn cáp'].apply(lambda x: str(x).split('.')[0] if '.' in str(x) else str(x)) 
-        pop_list = sorted(df['POP'].unique()) 
-        selected_pop = st.sidebar.selectbox("LỌC DỮ LIỆU POP", pop_list, key="selected_pop") 
-        pop_df = df[df['POP'] == selected_pop].copy() 
-    else: 
-        pop_df = df.copy() 
-
-    G = nx.Graph() 
-    node_coords = {} 
-
-    for _, row in pop_df.iterrows(): 
-        k1 = str(row.get('Điểm KN1', '')).strip() 
-        k2 = str(row.get('Điểm KN2', '')).strip() 
-        cable = str(row.get('Tên đoạn cáp', f"{k1}-{k2}")).strip() 
-        
-        len_val = row.get('Chiều dài thực (m)') 
-        length = float(len_val) if pd.notnull(len_val) else 0.0 
-        
-        try: 
-            if lat_col1 and lon_col1 and pd.notnull(row[lat_col1]) and pd.notnull(row[lon_col1]): 
-                node_coords[k1] = (float(row[lat_col1]), float(row[lon_col1])) 
-            if lat_col2 and lon_col2 and pd.notnull(row[lat_col2]) and pd.notnull(row[lon_col2]): 
-                node_coords[k2] = (float(row[lat_col2]), float(row[lon_col2])) 
-        except Exception: 
-            pass 
-
-        if k1 and k2: 
-            G.add_edge(k1, k2, cable=cable, length=length) 
-
-    st.sidebar.markdown("---") 
-    st.sidebar.subheader("📍 THÔNG TIN ĐO (OTDR)") 
-    
-    all_nodes = sorted(list(G.nodes())) 
-    if all_nodes: 
-        start_node = st.sidebar.selectbox("Điểm đo (Đang đứng)", all_nodes, key="start_node") 
-        neighbors = list(G.neighbors(start_node)) if start_node in G else [] 
-        direction_node = st.sidebar.selectbox("Hướng đo (Xuôi ngọn / Về ODF)", neighbors, key="direction_node") 
-        measured_len = st.sidebar.number_input("Chiều dài đo được (Mét)", min_value=0.0, value=170.0, step=10.0, key="measured_len") 
-
-        col_btn1, col_btn2 = st.sidebar.columns(2) 
-        with col_btn1: 
-            btn_calc = st.button("🎯 Xác định", type="primary", use_container_width=True) 
-        with col_btn2: 
-            btn_reset = st.button("🔄 Xóa", use_container_width=True) 
-
-        if btn_reset: 
-            st.session_state.break_result = None 
-            st.session_state.break_gps = None 
-            st.rerun() 
-
-        if btn_calc and start_node and direction_node: 
-            current = start_node 
-            nxt = direction_node 
-            accumulated = 0.0 
-            visited = {current} 
-
-            b_res = None 
-            b_gps = None 
-
-            while True: 
-                edge_data = G[current][nxt] 
-                seg_len = edge_data['length'] 
-                cable_id = edge_data['cable'] 
-                visited.add(nxt) 
-
-                if accumulated + seg_len >= measured_len: 
-                    d1 = measured_len - accumulated 
-                    d2 = seg_len - d1 
-                    b_res = { 
-                        "cable": cable_id, 
-                        "from": current, 
-                        "to": nxt, 
-                        "d1": d1, 
-                        "d2": d2, 
-                        "seg_len": seg_len, 
-                        "total": measured_len 
-                    } 
-
-                    if current in node_coords and nxt in node_coords and seg_len > 0: 
-                        lat1, lon1 = node_coords[current] 
-                        lat2, lon2 = node_coords[nxt] 
-                        ratio = d1 / seg_len 
-                        break_lat = lat1 + (lat2 - lat1) * ratio 
-                        break_lon = lon1 + (lon2 - lon1) * ratio 
-                        b_gps = (break_lat, break_lon) 
-                    break 
-                else: 
-                    accumulated += seg_len 
-                    next_nodes = [n for n in G.neighbors(nxt) if n not in visited] 
-                    if not next_nodes: 
-                        break 
-                    current = nxt 
-                    nxt = next_nodes[0] 
-
-            st.session_state.break_result = b_res 
-            st.session_state.break_gps = b_gps 
-            st.rerun() 
-
-    # Hiển thị trên Sidebar khi có kết quả
-    if st.session_state.break_result: 
-        res = st.session_state.break_result 
-        st.sidebar.error("📍 VỊ TRÍ ĐỨT CÁP DỰ KIẾN") 
-        st.sidebar.markdown(f"**Đoạn cáp:** `{res['cable']}`") 
-        
-        st.sidebar.markdown("---")
-        st.sidebar.markdown("**📐 Khoảng cách đến 2 điểm kết nối:**")
-        st.sidebar.info(
-            f"🔹 **Từ {res['from']}:** `{res['d1']:.1f} m` (Tổng {res['seg_len']}m)\n\n"
-            f"🔸 **Từ {res['to']}:** `{res['d2']:.1f} m`"
-        )
-          
-        if st.session_state.break_gps: 
-            gps = st.session_state.break_gps 
-            gmap_url = f"https://www.google.com/maps/dir/?api=1&destination={gps[0]},{gps[1]}" 
-            st.sidebar.markdown(f"📍 **GPS:** `{gps[0]:.6f}, {gps[1]:.6f}`") 
-            st.sidebar.link_button("🚗 Dẫn đường qua Google Maps App", gmap_url, type="primary", use_container_width=True)
-
-    # 2. Chuẩn bị Dữ liệu Render Bản đồ Leaflet JS
-    map_center = [21.0285, 105.8542] 
-    zoom_lvl = 12 
-
-    if st.session_state.break_gps: 
-        map_center = list(st.session_state.break_gps)
-        zoom_lvl = 18 
-    elif len(node_coords) > 0: 
-        first_coord = list(node_coords.values())[0] 
-        map_center = [first_coord[0], first_coord[1]] 
-        zoom_lvl = 15 
-
-    polylines = []
-    markers = []
-    break_marker = None
-
-    if st.session_state.break_result: 
-        u = st.session_state.break_result['from'] 
-        v = st.session_state.break_result['to'] 
-
-        if u in node_coords and v in node_coords: 
-            polylines.append({
-                "coords": [node_coords[u], node_coords[v]],
-                "color": "#EF4444",
-                "weight": 6,
-                "opacity": 0.9,
-                "tooltip": f"Sự cố đoạn: {st.session_state.break_result['cable']}"
-            })
-
-            for node in [u, v]: 
-                markers.append({
-                    "coords": node_coords[node],
-                    "popup": f"<b>Điểm Kết Nối:</b> {node}",
-                    "tooltip": f"Điểm KN: {node}",
-                    "color": "#3B82F6",
-                    "radius": 7
-                })
-
-        if st.session_state.break_gps: 
-            res = st.session_state.break_result
-            gps = st.session_state.break_gps
-            gmap_url = f"https://www.google.com/maps/dir/?api=1&destination={gps[0]},{gps[1]}"
-            
-            popup_html = f"""
-            <div style="font-family: Arial, sans-serif; min-width: 180px;">
-                <b style="color: #DC2626; font-size: 13px;">🚨 VỊ TRÍ ĐỨT CÁP: {res['cable']}</b><br/>
-                <div style="margin: 6px 0; font-size: 12px; line-height: 1.4;">
-                    • Cách <b>{res['from']}</b>: {res['d1']:.1f}m<br/>
-                    • Cách <b>{res['to']}</b>: {res['d2']:.1f}m
-                </div>
-                <a href="{gmap_url}" target="_blank" style="
-                    display: inline-block;
-                    width: 100%;
-                    text-align: center;
-                    background-color: #10B981;
-                    color: white;
-                    padding: 6px 0;
-                    margin-top: 4px;
-                    border-radius: 4px;
-                    text-decoration: none;
-                    font-weight: bold;
-                    font-size: 11px;
-                ">🚗 Mở dẫn đường trên App Google Maps</a>
-            </div>
-            """
-            
-            break_marker = {
-                "coords": list(st.session_state.break_gps),
-                "popup": popup_html,
-                "tooltip": "🚨 Vị trí đứt cáp dự kiến"
+# ----------------------------------------------------
+# 5. Xử lý tối ưu hóa lộ trình và Hiển thị
+# ----------------------------------------------------
+if st.sidebar.button("🚀 Tối ưu đường đi"):
+    if not final_selected_names:
+        st.warning("Vui lòng chọn hoặc upload ít nhất 1 tập điểm!")
+    else:
+        # Chuẩn bị dữ liệu danh sách điểm chọn
+        target_points = [
+            {
+                "name": name,
+                "lat": all_points[name]["lat"],
+                "lon": all_points[name]["lon"],
             }
+            for name in final_selected_names
+        ]
 
-    else: 
-        for u, v, data in G.edges(data=True): 
-            if u in node_coords and v in node_coords: 
-                polylines.append({
-                    "coords": [node_coords[u], node_coords[v]],
-                    "color": "#2B5C8F",
-                    "weight": 3,
-                    "opacity": 0.6,
-                    "tooltip": f"Cáp: {data.get('cable', '')}"
-                })
+        # Giải bài toán lộ trình
+        start_coords = (start_lat, start_lon)
+        optimized_route = solve_tsp(start_coords, target_points)
 
-        for node_id, coord in node_coords.items(): 
-            markers.append({
-                "coords": coord,
-                "popup": f"<b>Điểm KN:</b> {node_id}",
-                "tooltip": str(node_id),
-                "color": "#2B5C8F",
-                "radius": 4
-            })
+        # Tính tổng quãng đường
+        total_dist = 0
+        current_p = start_coords
+        for p in optimized_route:
+            next_p = (p["lat"], p["lon"])
+            total_dist += geodesic(current_p, next_p).km
+            current_p = next_p
 
-    # Leaflet HTML (Đã di chuyển Zoom + Layer Map xuống cạnh dưới)
-    leaflet_html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        
-        <!-- Leaflet CSS & JS -->
-        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        st.subheader(f"📊 Kết quả lộ trình (Tổng chiều dài ~ {total_dist:.2f} km)")
 
-        <!-- Leaflet Routing Machine CSS & JS -->
-        <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
-        <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+        # Tạo bản đồ Folium
+        m = folium.Map(location=[start_lat, start_lon], zoom_start=14)
 
-        <style>
-            html, body {{
-                width: 100%;
-                height: 100vh;
-                margin: 0;
-                padding: 0;
-                overflow: hidden;
-            }}
-            #map {{
-                width: 100%;
-                height: 100vh;
-                background: #e5e3df;
-            }}
-            .custom-break-icon {{
-                background-color: #EF4444;
-                border: 2px solid #FFFFFF;
-                border-radius: 50%;
-                width: 24px !important;
-                height: 24px !important;
-                margin-left: -12px !important;
-                margin-top: -12px !important;
-                box-shadow: 0 0 10px rgba(239, 68, 68, 0.8);
-                animation: pulse 1.5s infinite;
-            }}
-            @keyframes pulse {{
-                0% {{ transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }}
-                70% {{ transform: scale(1.2); box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); }}
-                100% {{ transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }}
-            }}
-            .user-location-marker {{
-                background-color: #2563EB;
-                border: 3px solid #FFFFFF;
-                border-radius: 50%;
-                width: 18px !important;
-                height: 18px !important;
-                margin-left: -9px !important;
-                margin-top: -9px !important;
-                box-shadow: 0 0 8px rgba(37, 99, 235, 0.8);
-            }}
-            .leaflet-control-btn {{
-                background-color: #ffffff;
-                border: 2px solid rgba(0,0,0,0.2);
-                border-radius: 4px;
-                padding: 4px 8px;
-                cursor: pointer;
-                font-size: 14px;
-                font-weight: bold;
-                box-shadow: 0 1px 5px rgba(0,0,0,0.4);
-                display: flex;
-                align-items: center;
-                gap: 4px;
-            }}
-            .leaflet-control-btn:hover {{
-                background-color: #f4f4f4;
-            }}
-            /* Ẩn hoàn toàn bảng hướng dẫn từng bước của Leaflet Routing */
-            .leaflet-routing-container {{
-                display: none !important;
-            }}
-            /* Điều chỉnh lề dưới cho gọn trên di động */
-            .leaflet-bottom {{
-                margin-bottom: 10px;
-            }}
-        </style>
-    </head>
-    <body>
-        <div id="map"></div>
-        <script>
-            document.addEventListener("DOMContentLoaded", function() {{
-                // 1. Tile Google Đường phố
-                var googleStreets = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={{x}}&y={{y}}&z={{z}}', {{
-                    maxZoom: 20,
-                    attribution: 'Google Maps'
-                }});
+        # Đánh dấu vị trí xuất phát
+        folium.Marker(
+            [start_lat, start_lon],
+            popup="Vị trí xuất phát (GPS)",
+            icon=folium.Icon(color="red", icon="user"),
+        ).add_to(m)
 
-                // 2. Tile Google Vệ tinh
-                var googleSat = L.tileLayer('https://mt1.google.com/vt/lyrs=s,h&x={{x}}&y={{y}}&z={{z}}', {{
-                    maxZoom: 20,
-                    attribution: 'Google Maps Satellite'
-                }});
+        # Tạo danh sách tọa độ vẽ đường polyline
+        route_coords = [[start_lat, start_lon]]
 
-                // 3. Khởi tạo Map (Tắt zoomControl mặc định góc trên để chủ động đặt dưới)
-                var map = L.map('map', {{
-                    zoomControl: false, // 👈 Tắt nút Zoom mặc định ở góc trên
-                    attributionControl: false,
-                    layers: [googleStreets]
-                }}).setView({json.dumps(map_center)}, {zoom_lvl});
+        # Đánh dấu từng điểm theo thứ tự tối ưu
+        for idx, point in enumerate(optimized_route, start=1):
+            p_lat, p_lon = point["lat"], point["lon"]
+            route_coords.append([p_lat, p_lon])
 
-                // 4. Chuyển nút Zoom (+ / -) xuống CẠNH DƯỚI BÊN TRÁI
-                L.control.zoom({{
-                    position: 'bottomleft' // 👈 Chuyển xuống góc dưới bên trái
-                }}).addTo(map);
+            folium.Marker(
+                [p_lat, p_lon],
+                popup=f"Thứ tự {idx}: {point['name']}",
+                tooltip=f"{idx}. {point['name']}",
+                icon=folium.DivIcon(
+                    html=f'<div style="font-size: 12pt; color: white; background-color: blue; border-radius: 50%; width: 24px; height: 24px; text-align: center; line-height: 24px;">{idx}</div>'
+                ),
+            ).add_to(m)
 
-                // 5. Chuyển Bảng chuyển lớp nền (Layer Map) xuống CẠNH DƯỚI BÊN PHẢI
-                var baseMaps = {{
-                    "🗺️ Đường phố": googleStreets,
-                    "🛰️ Vệ tinh": googleSat
-                }};
-                L.control.layers(baseMaps, null, {{ 
-                    position: 'bottomright' // 👈 Chuyển xuống góc dưới bên phải
-                }}).addTo(map);
+        # Vẽ đường nối các điểm
+        folium.PolyLine(
+            route_coords, color="blue", weight=4, opacity=0.7
+        ).add_to(m)
 
-                // 6. Vẽ tuyến cáp
-                var polylinesData = {json.dumps(polylines)};
-                polylinesData.forEach(function(item) {{
-                    var line = L.polyline(item.coords, {{
-                        color: item.color,
-                        weight: item.weight,
-                        opacity: item.opacity
-                    }}).addTo(map);
-                    if (item.tooltip) line.bindTooltip(item.tooltip);
-                }});
+        # Display Map
+        st_folium(m, width=900, height=500)
 
-                // 7. Vẽ điểm kết nối (KN)
-                var markersData = {json.dumps(markers)};
-                markersData.forEach(function(item) {{
-                    var circle = L.circleMarker(item.coords, {{
-                        radius: item.radius,
-                        color: item.color,
-                        fillColor: '#FFFFFF',
-                        fillOpacity: 0.9,
-                        weight: 2
-                    }}).addTo(map);
-                    if (item.popup) circle.bindPopup(item.popup);
-                    if (item.tooltip) circle.bindTooltip(item.tooltip);
-                }});
-
-                // 8. Vẽ điểm đứt cáp
-                var breakMarkerData = {json.dumps(break_marker)};
-                if (breakMarkerData) {{
-                    var breakIcon = L.divIcon({{ className: 'custom-break-icon' }});
-                    var bMarker = L.marker(breakMarkerData.coords, {{ icon: breakIcon }}).addTo(map);
-                    if (breakMarkerData.popup) bMarker.bindPopup(breakMarkerData.popup).openPopup();
-                    if (breakMarkerData.tooltip) bMarker.bindTooltip(breakMarkerData.tooltip);
-                }}
-
-                // 9. Định vị GPS người dùng
-                var userLatLng = null;
-                var userMarker = null;
-                var accuracyCircle = null;
-
-                function onLocationFound(e) {{
-                    userLatLng = e.latlng;
-                    var radius = e.accuracy / 2;
-
-                    if (userMarker) {{
-                        userMarker.setLatLng(e.latlng);
-                        accuracyCircle.setLatLng(e.latlng).setRadius(radius);
-                    }} else {{
-                        var userIcon = L.divIcon({{ className: 'user-location-marker' }});
-                        userMarker = L.marker(e.latlng, {{ icon: userIcon }}).addTo(map)
-                            .bindPopup("<b>Vị trí hiện tại của bạn</b>");
-                        accuracyCircle = L.circle(e.latlng, radius, {{
-                            color: '#2563EB',
-                            fillColor: '#3B82F6',
-                            fillOpacity: 0.15,
-                            weight: 1
-                        }}).addTo(map);
-                    }}
-                }}
-
-                function onLocationError(e) {{
-                    console.log("Không thể truy cập GPS: " + e.message);
-                }}
-
-                map.on('locationfound', onLocationFound);
-                map.on('locationerror', onLocationError);
-                map.locate({{ watch: true, setView: false, enableHighAccuracy: true }});
-
-                // 10. Tính năng Chỉ đường Routing từ GPS đến Điểm Đứt cáp
-                var routingControl = null;
-
-                function drawRouteToDestination() {{
-                    if (!userLatLng) {{
-                        alert("Chưa xác định được vị trí GPS hiện tại của bạn. Vui lòng cho phép quyền truy cập vị trí trên trình duyệt.");
-                        return;
-                    }}
-
-                    var destLatLng = null;
-                    if (breakMarkerData) {{
-                        destLatLng = L.latLng(breakMarkerData.coords[0], breakMarkerData.coords[1]);
-                    }} else if (markersData.length > 0) {{
-                        destLatLng = L.latLng(markersData[0].coords[0], markersData[0].coords[1]);
-                    }}
-
-                    if (!destLatLng) {{
-                        alert("Chưa chọn vị trí đứt cáp hoặc điểm kết nối nào để chỉ đường!");
-                        return;
-                    }}
-
-                    if (routingControl) {{
-                        map.removeControl(routingControl);
-                    }}
-
-                    routingControl = L.Routing.control({{
-                        waypoints: [
-                            userLatLng,
-                            destLatLng
-                        ],
-                        routeWhileDragging: false,
-                        addWaypoints: false,
-                        show: false,
-                        lineOptions: {{
-                            styles: [{{ color: '#059669', opacity: 0.8, weight: 6 }}]
-                        }}
-                    }}).addTo(map);
-                }}
-
-                // 11. Tạo bảng điều khiển Nút Bấm GPS & Chỉ Đường (Góc trên bên trái)
-                var CustomControls = L.Control.extend({{
-                    options: {{ position: 'topleft' }},
-                    onAdd: function (map) {{
-                        var container = L.DomUtil.create('div', 'leaflet-bar');
-                        container.style.display = 'flex';
-                        container.style.flexDirection = 'column';
-                        container.style.gap = '5px';
-
-                        // Nút định vị GPS
-                        var btnLocate = L.DomUtil.create('div', 'leaflet-control-btn', container);
-                        btnLocate.innerHTML = '🎯 GPS của tôi';
-                        btnLocate.onclick = function() {{
-                            if (userLatLng) {{
-                                map.setView(userLatLng, 18);
-                            }} else {{
-                                map.locate({{ setView: true, maxZoom: 18, enableHighAccuracy: true }});
-                            }}
-                        }};
-
-                        // Nút chỉ đường
-                        var btnRoute = L.DomUtil.create('div', 'leaflet-control-btn', container);
-                        btnRoute.innerHTML = '🚗 Chỉ đường tới điểm sự cố';
-                        btnRoute.style.backgroundColor = '#10B981';
-                        btnRoute.style.color = '#FFFFFF';
-                        btnRoute.onclick = function() {{
-                            drawRouteToDestination();
-                        }};
-
-                        return container;
-                    }}
-                }});
-
-                map.addControl(new CustomControls());
-            }});
-        </script>
-    </body>
-    </html>
-    """
-
-    # Render bản đồ tràn màn hình bằng Streamlit components
-    components.html(leaflet_html, height=1000, scrolling=False)
-
-else:
-    st.warning("⚠️ Không tìm thấy tệp dữ liệu Excel `.xlsx` hoặc `.xls` trong thư mục làm việc.")
+        # Hiển thị bảng thứ tự di chuyển
+        st.write("### Thứ tự danh sách điểm cần đến:")
+        route_df = pd.DataFrame(optimized_route)[["name", "lat", "lon"]]
+        route_df.index = np.arange(1, len(route_df) + 1)
+        st.dataframe(route_df)
