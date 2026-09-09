@@ -13,6 +13,49 @@ st.set_page_config(
     page_title="Tối ưu đường di chuyển xe máy", layout="wide"
 )
 
+# -------------------------------------------------------------
+# CSS TÙY CHỈNH NÚT TOGGLE CÓ SẴN (BO TRÒN, MÀU XANH NEON)
+# -------------------------------------------------------------
+st.markdown(
+    """
+    <style>
+    /* Nút ẩn/mở Sidebar có sẵn của Streamlit - Bo tròn & Màu Xanh Neon */
+    button[aria-label="Close sidebar"], 
+    button[aria-label="Open sidebar"],
+    [data-testid="collapsedControl"] {
+        background-color: #00ffcc !important;
+        color: #000000 !important;
+        border-radius: 50% !important;
+        border: 2px solid #00ffcc !important;
+        box-shadow: 0 0 12px #00ffcc, 0 0 20px rgba(0, 255, 204, 0.6) !important;
+        transition: all 0.3s ease-in-out !important;
+        width: 42px !important;
+        height: 42px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        z-index: 999999 !important;
+    }
+
+    button[aria-label="Close sidebar"]:hover, 
+    button[aria-label="Open sidebar"]:hover,
+    [data-testid="collapsedControl"]:hover {
+        background-color: #00e6b8 !important;
+        transform: scale(1.1) !important;
+        box-shadow: 0 0 18px #00ffcc, 0 0 28px rgba(0, 255, 204, 0.9) !important;
+    }
+
+    /* Đảm bảo nút nổi rõ nét trên giao diện */
+    [data-testid="collapsedControl"] svg {
+        fill: #000000 !important;
+        color: #000000 !important;
+        stroke: #000000 !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 # Sidebar Title
 st.sidebar.title("🏍️ Tối ưu hóa quãng đường di chuyển (Xe máy)")
 
@@ -21,7 +64,6 @@ st.sidebar.title("🏍️ Tối ưu hóa quãng đường di chuyển (Xe máy)"
 # -------------------------------------------------------------
 st.sidebar.header("📍 Điểm xuất phát (GPS Điện thoại)")
 
-# HTML/JS lấy GPS trình duyệt truyền về Session State
 gps_code = """
 <script>
 if (navigator.geolocation) {
@@ -45,11 +87,9 @@ if (navigator.geolocation) {
 
 gps_data = components.html(gps_code, height=0)
 
-# Khởi tạo tọa độ mặc định (Trung tâm Tuyên Quang) nếu chưa bật GPS
 if "user_gps" not in st.session_state:
     st.session_state.user_gps = {"lat": 21.82714, "lon": 105.19952}
 
-# Cập nhật nếu thiết bị phản hồi tọa độ GPS
 if gps_data and isinstance(gps_data, dict) and "lat" in gps_data:
     st.session_state.user_gps = gps_data
 
@@ -219,7 +259,6 @@ def solve_tsp_from_gps(gps_coords, intermediate_points, end_point=None):
     current_pos = gps_coords
     route = []
 
-    # Tìm điểm TQGP0xx gần vị trí GPS hiện tại nhất, sau đó lần lượt tối ưu các điểm tiếp theo
     while unvisited:
         nearest = min(
             unvisited,
@@ -229,7 +268,6 @@ def solve_tsp_from_gps(gps_coords, intermediate_points, end_point=None):
         current_pos = (nearest["lat"], nearest["lon"])
         unvisited.remove(nearest)
 
-    # Thêm điểm kết thúc (nếu có chọn) vào cuối
     if end_point:
         route.append(end_point)
 
@@ -237,7 +275,65 @@ def solve_tsp_from_gps(gps_coords, intermediate_points, end_point=None):
 
 
 # -------------------------------------------------------------
-# 6. XỬ LÝ SỰ KIỆN TÍNH TOÁN
+# 6. HÀM TẠO BẢN ĐỒ KÈM NÚT MENU TẮT/MỞ SIDEBAR TRÊN MAP
+# -------------------------------------------------------------
+def create_map_with_menu_button(location, zoom=14):
+    m = folium.Map(
+        location=location,
+        zoom_start=zoom,
+        tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
+        attr="Google Maps",
+    )
+
+    # Nút định vị GPS Realtime
+    LocateControl(
+        auto_start=False,
+        flyTo=True,
+        keepCurrentZoomLevel=True,
+        strings={"title": "Định vị vị trí của tôi"},
+    ).add_to(m)
+
+    # Nút Custom HTML/JS Menu Tắt/Mở Sidebar ngay trên Màn hình Map
+    menu_button_html = """
+    <div style="position: fixed; top: 80px; left: 12px; z-index: 9999;">
+        <button onclick="toggleSidebar()" style="
+            background-color: #00ffcc;
+            color: #000000;
+            border: 2px solid #00ffcc;
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 0 12px #00ffcc, 0 0 20px rgba(0,255,204,0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s;
+        " onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1.0)'" title="Tắt / Mở Thanh Menu">
+            ☰
+        </button>
+    </div>
+    <script>
+    function toggleSidebar() {
+        var sidebarCloseBtn = window.parent.document.querySelector('button[aria-label="Close sidebar"]');
+        var sidebarOpenBtn = window.parent.document.querySelector('button[aria-label="Open sidebar"]');
+        
+        if (sidebarCloseBtn) {
+            sidebarCloseBtn.click();
+        } else if (sidebarOpenBtn) {
+            sidebarOpenBtn.click();
+        }
+    }
+    </script>
+    """
+    m.get_root().html.add_child(folium.Element(menu_button_html))
+    return m
+
+
+# -------------------------------------------------------------
+# 7. XỬ LÝ SỰ KIỆN TÍNH TOÁN
 # -------------------------------------------------------------
 if "calculated_route" not in st.session_state:
     st.session_state.calculated_route = None
@@ -248,9 +344,7 @@ if st.sidebar.button("🚀 Tối ưu đường đi XE MÁY"):
             "Vui lòng chọn điểm TQGP0xx hoặc nhập Điểm Kết Thúc!"
         )
     else:
-        with st.spinner(
-            "Đang lấy tọa độ GPS điện thoại & tính toán lộ trình xe máy..."
-        ):
+        with st.spinner("Đang tính toán lộ trình xe máy..."):
             gps_start_coords = (curr_lat, curr_lon)
 
             intermediate_points = [
@@ -269,7 +363,7 @@ if st.sidebar.button("🚀 Tối ưu đường đi XE MÁY"):
 
 
 # -------------------------------------------------------------
-# 7. HIỂN THỊ BẢN ĐỒ VIEW MAP
+# 8. HIỂN THỊ BẢN ĐỒ VIEW MAP
 # -------------------------------------------------------------
 if st.session_state.calculated_route is not None:
     optimized_route = st.session_state.calculated_route
@@ -285,21 +379,9 @@ if st.session_state.calculated_route is not None:
         f"📊 **Lộ trình xuất phát từ GPS của bạn**\n\nTổng quãng đường xe máy: **~ {real_distance:.2f} km**"
     )
 
-    m = folium.Map(
-        location=[s_lat, s_lon],
-        zoom_start=14,
-        tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
-        attr="Google Maps",
-    )
+    m = create_map_with_menu_button([s_lat, s_lon], zoom=14)
 
-    LocateControl(
-        auto_start=False,
-        flyTo=True,
-        keepCurrentZoomLevel=True,
-        strings={"title": "Định vị vị trí của tôi"},
-    ).add_to(m)
-
-    # Marker Điểm xuất phát = GPS Thực tế từ điện thoại
+    # Xuất phát GPS
     folium.Marker(
         [s_lat, s_lon],
         popup="Vị trí GPS của bạn (Xuất phát)",
@@ -307,7 +389,7 @@ if st.session_state.calculated_route is not None:
         icon=folium.Icon(color="green", icon="user", prefix="fa"),
     ).add_to(m)
 
-    # Marker các điểm ghé và đích đến
+    # Các điểm ghé & đích đến
     for idx, point in enumerate(optimized_route, start=1):
         p_lat, p_lon = point["lat"], point["lon"]
         is_end = idx == len(optimized_route) and end_location is not None
@@ -322,7 +404,6 @@ if st.session_state.calculated_route is not None:
             ),
         ).add_to(m)
 
-    # Đường xe máy chỉ dẫn
     folium.PolyLine(
         detailed_path, color="#e63946", weight=5, opacity=0.85
     ).add_to(m)
@@ -330,13 +411,8 @@ if st.session_state.calculated_route is not None:
     m.fit_bounds(stopping_coords)
     st_folium(m, use_container_width=True, height=850, returned_objects=[])
 else:
-    # Màn hình chờ mặc định mở vị trí GPS của thiết bị
-    m_default = folium.Map(
-        location=[curr_lat, curr_lon],
-        zoom_start=14,
-        tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
-        attr="Google Maps",
-    )
+    # Màn hình chờ mặc định
+    m_default = create_map_with_menu_button([curr_lat, curr_lon], zoom=14)
     folium.Marker(
         [curr_lat, curr_lon],
         popup="Vị trí hiện tại của bạn",
