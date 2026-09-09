@@ -162,7 +162,7 @@ unique_keys = sorted(list(all_points.keys()))
 
 
 # -------------------------------------------------------------
-# 4. TÌM KIẾM ĐẮM ĐẾN (TUYÊN QUANG)
+# 4. TÌM KIẾM ĐÍCH ĐẾN (TUYÊN QUANG)
 # -------------------------------------------------------------
 st.sidebar.header("🔍 Tìm kiếm Đích đến (Tuyên Quang)")
 search_query = st.sidebar.text_input(
@@ -367,10 +367,10 @@ if st.session_state.calculated_route is not None:
 
     m = build_map([s_lat, s_lon], zoom=14)
 
+    # Đã xóa tooltip tại đây
     folium.Marker(
         [s_lat, s_lon],
         popup="Vị trí GPS của bạn (Xuất phát)",
-        tooltip="📍 Xuất phát (GPS Vị trí của bạn)",
         icon=folium.Icon(color="green", icon="user", prefix="fa"),
     ).add_to(m)
 
@@ -397,10 +397,10 @@ if st.session_state.calculated_route is not None:
     st_folium(m, use_container_width=True, height=1000, returned_objects=[])
 else:
     m_default = build_map([curr_lat, curr_lon], zoom=14)
+    # Đã xóa tooltip tại đây
     folium.Marker(
         [curr_lat, curr_lon],
         popup="Vị trí hiện tại của bạn",
-        tooltip="📍 GPS Vị trí của bạn",
         icon=folium.Icon(color="green", icon="user", prefix="fa"),
     ).add_to(m_default)
 
