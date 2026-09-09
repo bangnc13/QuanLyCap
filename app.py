@@ -327,7 +327,7 @@ if st.sidebar.button("🚀 Lộ trình "):
 
 
 # -------------------------------------------------------------
-# 9. HIỂN THỊ BẢN ĐỒ VIEW MAP
+# 9. HIỂN THỊ BẢN ĐỒ VIEW MAP (BIỂU TƯỢNG GPS ICON)
 # -------------------------------------------------------------
 def build_map(location, zoom=14):
     m = folium.Map(
@@ -345,7 +345,7 @@ def build_map(location, zoom=14):
         strings={"title": "Định vị vị trí của tôi"},
     ).add_to(m)
 
-    # Inject CSS trực tiếp vào Iframe bản đồ để đẩy toàn bộ nút (+, -, GPS) xuống 75px
+    # CSS cập nhật nút GPS thành Icon SVG vị trí tròn
     custom_css = """
     <style>
     .leaflet-top.leaflet-left {
@@ -357,7 +357,6 @@ def build_map(location, zoom=14):
         border-radius: 50% !important;
         width: 44px !important;
         height: 44px !important;
-        line-height: 40px !important;
         box-shadow: 0 0 12px #00ffcc, 0 0 20px rgba(0, 255, 204, 0.7) !important;
         display: flex !important;
         align-items: center !important;
@@ -366,11 +365,13 @@ def build_map(location, zoom=14):
     }
     .leaflet-control-locate a span { display: none !important; }
     .leaflet-control-locate a::after {
-        content: "GPS" !important;
-        font-weight: 900 !important;
-        font-size: 13px !important;
-        color: #000000 !important;
-        font-family: sans-serif !important;
+        content: "" !important;
+        width: 22px !important;
+        height: 22px !important;
+        background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="black"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>') !important;
+        background-repeat: no-repeat !important;
+        background-position: center !important;
+        background-size: contain !important;
     }
     </style>
     """
