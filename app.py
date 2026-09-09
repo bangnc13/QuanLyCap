@@ -13,7 +13,7 @@ st.set_page_config(page_title="Tối ưu đường đi kỹ thuật", layout="wi
 st.title("🚗 Tối ưu hóa quãng đường di chuyển")
 
 
-# 1. Đọc dữ liệu GeoJSON an toàn
+# 1. Đọc GeoJSON linh hoạt (quét sạch các thuộc tính name/id/label)
 @st.cache_data
 def load_geojson(file_path):
     if not os.path.exists(file_path):
@@ -27,46 +27,48 @@ def load_geojson(file_path):
         props = feature.get("properties", {})
         geom = feature.get("geometry", {})
 
-        # Tên điểm trong file GeoJSON
-        name = str(props.get("name", "")).strip()
-
-        if name and geom.get("type") == "Point":
+        if geom.get("type") == "Point":
             coords = geom.get("coordinates", [])
             if len(coords) >= 2:
-                points[name] = {
-                    "lat": coords[1],
-                    "lon": coords[0],
-                    "id": props.get("id"),
-                }
+                # Gom tất cả thuộc tính dạng chữ thành danh sách định danh
+                possible_names = []
+                for val in props.values():
+                    if isinstance(val, (str, int)):
+                        possible_names.append(str(val).strip())
+
+                # Lưu tọa độ cho từng định danh tìm được
+                for p_name in possible_names:
+                    if p_name:
+                        points[p_name] = {"lat": coords[1], "lon": coords[0]}
     return points
 
 
-# Đảm bảo file data.geojson được đặt cùng thư mục với app.py trên GitHub
 GEOJSON_FILE = "data.geojson"
 all_points = load_geojson(GEOJSON_FILE)
 
 if not all_points:
     st.error(
-        f"⚠️ Không tìm thấy file '{GEOJSON_FILE}' trong thư mục ứng dụng! Vui lòng upload file '{GEOJSON_FILE}' lên GitHub."
+        f"⚠️ File '{GEOJSON_FILE}' không có dữ liệu tọa độ hoặc lỗi định dạng!"
     )
 
 # 2. Vị trí GPS
 st.sidebar.header("📍 Vị trí GPS xuất phát")
 location = get_geolocation()
 
-start_lat, start_lon = 21.82714, 105.19952  # Giá trị mặc định từ GPS của bạn
+start_lat, start_lon = 21.82714, 105.19952
 if location and "coords" in location:
     start_lat = location["coords"]["latitude"]
     start_lon = location["coords"]["longitude"]
     st.sidebar.success(f"GPS: {start_lat:.5f}, {start_lon:.5f}")
 else:
-    st.sidebar.info(f"Sử dụng vị trí GPS mặc định: {start_lat}, {start_lon}")
+    st.sidebar.info(f"Sử dụng GPS mặc định: {start_lat}, {start_lon}")
 
 st.sidebar.header("📋 Danh sách tập điểm cần đến")
 
-# Chọn từ danh sách
+# Multiselect các điểm có trong GeoJSON
+unique_keys = list(all_points.keys())
 selected_from_list = st.sidebar.multiselect(
-    "Chọn điểm từ tập dữ liệu:", options=list(all_points.keys())
+    "Chọn điểm từ tập dữ liệu:", options=unique_keys
 )
 
 # Upload File Excel
@@ -78,21 +80,29 @@ excel_points = []
 if uploaded_file:
     try:
         df = pd.read_excel(uploaded_file, header=None)
-        # Chuyển toàn bộ nội dung file excel thành chuỗi
-        raw_codes = df.astype(str).values.flatten()
+        # Lấy toàn bộ ô dữ liệu dạng chuỗi
+        raw_values = df.astype(str).values.flatten()
 
-        for code in raw_codes:
-            clean_code = code.strip()
-            # Đối chiếu trực tiếp với danh sách GeoJSON
-            if clean_code in all_points:
-                excel_points.append(clean_code)
-            else:
-                # Xử lý trường hợp chữ HO/HƠ bị lệch ký tự
-                alt_code = clean_code.replace("/HO", "/HƠ").replace(
-                    "/HƠ", "/HO"
-                )
-                if alt_code in all_points:
-                    excel_points.append(alt_code)
+        for val in raw_values:
+            val_clean = val.strip()
+            if not val_clean or val_clean == "nan":
+                continue
+
+            # 1. So sánh chính xác
+            if val_clean in all_points:
+                excel_points.append(val_clean)
+                continue
+
+            # 2. So sánh thay thế HO <-> HƠ
+            alt_val = val_clean.replace("/HO", "/HƠ").replace("/HƠ", "/HO")
+            if alt_val in all_points:
+                excel_points.append(alt_val)
+                continue
+
+            # 3. So sánh tương đối (Ví dụ Excel là TQGP013.0290/HO nhưng GeoJSON ghi TQGP013.0290)
+            prefix_match = val_clean.split("/")[0]
+            if prefix_match in all_points:
+                excel_points.append(prefix_match)
 
         st.sidebar.info(
             f"Tìm thấy {len(excel_points)} điểm hợp lệ từ file Excel."
@@ -100,11 +110,10 @@ if uploaded_file:
     except Exception as e:
         st.sidebar.error(f"Lỗi đọc file Excel: {e}")
 
-# Tổng hợp các điểm được chọn
 final_selected_names = list(set(selected_from_list + excel_points))
 
 
-# 3. Thuật toán tối ưu (Nearest Neighbor)
+# 3. Thuật toán TSP
 def solve_tsp(start_coords, points):
     unvisited = points.copy()
     current_pos = start_coords
@@ -122,7 +131,7 @@ def solve_tsp(start_coords, points):
     return route
 
 
-# 4. Hiển thị kết quả & Bản đồ
+# 4. Hiển thị Kết quả & Bản đồ
 if st.sidebar.button("🚀 Tối ưu đường đi"):
     if not final_selected_names:
         st.warning("Vui lòng chọn hoặc upload ít nhất 1 tập điểm hợp lệ!")
@@ -139,7 +148,6 @@ if st.sidebar.button("🚀 Tối ưu đường đi"):
         start_coords = (start_lat, start_lon)
         optimized_route = solve_tsp(start_coords, target_points)
 
-        # Tính khoảng cách
         total_dist = 0
         current_p = start_coords
         for p in optimized_route:
@@ -149,7 +157,6 @@ if st.sidebar.button("🚀 Tối ưu đường đi"):
 
         st.subheader(f"📊 Kết quả lộ trình (Tổng chiều dài ~ {total_dist:.2f} km)")
 
-        # Vẽ bản đồ
         m = folium.Map(location=[start_lat, start_lon], zoom_start=13)
         folium.Marker(
             [start_lat, start_lon],
@@ -177,7 +184,6 @@ if st.sidebar.button("🚀 Tối ưu đường đi"):
 
         st_folium(m, width=900, height=500)
 
-        # Bảng chi tiết
         route_df = pd.DataFrame(optimized_route)[["name", "lat", "lon"]]
         route_df.index = np.arange(1, len(route_df) + 1)
         st.dataframe(route_df)
