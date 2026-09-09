@@ -14,12 +14,12 @@ st.set_page_config(
 )
 
 # -------------------------------------------------------------
-# CSS TÙY CHỈNH NÚT TOGGLE CÓ SẴN (BO TRÒN, MÀU XANH NEON)
+# 1. CSS & JS BẮT SỰ KIỆN TOGGLE SIDEBAR TỪ IFRAME BẢN ĐỒ
 # -------------------------------------------------------------
 st.markdown(
     """
     <style>
-    /* Nút ẩn/mở Sidebar có sẵn của Streamlit - Bo tròn & Màu Xanh Neon */
+    /* Nút ẩn/mở Sidebar mặc định - Bo tròn & Màu Xanh Neon */
     button[aria-label="Close sidebar"], 
     button[aria-label="Open sidebar"],
     [data-testid="collapsedControl"] {
@@ -45,13 +45,32 @@ st.markdown(
         box-shadow: 0 0 18px #00ffcc, 0 0 28px rgba(0, 255, 204, 0.9) !important;
     }
 
-    /* Đảm bảo nút nổi rõ nét trên giao diện */
     [data-testid="collapsedControl"] svg {
         fill: #000000 !important;
         color: #000000 !important;
         stroke: #000000 !important;
     }
     </style>
+
+    <script>
+    // Lắng nghe tín hiệu postMessage gửi từ bản đồ để thực hiện bấm nút ẩn/mở Sidebar
+    window.addEventListener("message", function(event) {
+        if (event.data && event.data.type === "TOGGLE_SIDEBAR") {
+            var closeBtn = window.parent.document.querySelector('button[aria-label="Close sidebar"]');
+            var openBtn = window.parent.document.querySelector('button[aria-label="Open sidebar"]');
+            
+            if (closeBtn) {
+                closeBtn.click();
+            } else if (openBtn) {
+                openBtn.click();
+            } else {
+                // Thử tìm nút collapseControl mặc định của Streamlit
+                var collapseBtn = window.parent.document.querySelector('[data-testid="collapsedControl"] button');
+                if (collapseBtn) collapseBtn.click();
+            }
+        }
+    }, false);
+    </script>
     """,
     unsafe_allow_html=True,
 )
@@ -60,7 +79,7 @@ st.markdown(
 st.sidebar.title("🏍️ Tối ưu hóa quãng đường di chuyển (Xe máy)")
 
 # -------------------------------------------------------------
-# 1. BỘ LẤY TỌA ĐỘ GPS REALTIME TỪ ĐIỆN THOẠI/TRÌNH DUYỆT
+# 2. BỘ LẤY TỌA ĐỘ GPS REALTIME TỪ ĐIỆN THOẠI/TRÌNH DUYỆT
 # -------------------------------------------------------------
 st.sidebar.header("📍 Điểm xuất phát (GPS Điện thoại)")
 
@@ -102,7 +121,7 @@ st.sidebar.success(
 
 
 # -------------------------------------------------------------
-# 2. ĐỌC GEOJSON LỌC TQGP0xx
+# 3. ĐỌC GEOJSON LỌC TQGP0xx
 # -------------------------------------------------------------
 @st.cache_data
 def load_geojson(file_path):
@@ -137,7 +156,7 @@ unique_keys = sorted(list(all_points.keys()))
 
 
 # -------------------------------------------------------------
-# 3. TÌM KIẾM ĐẮM ĐẾN (TUYÊN QUANG)
+# 4. TÌM KIẾM ĐẮM ĐẾN (TUYÊN QUANG)
 # -------------------------------------------------------------
 st.sidebar.header("🔍 Tìm kiếm Đích đến (Tuyên Quang)")
 search_query = st.sidebar.text_input(
@@ -187,7 +206,7 @@ if search_query:
 
 
 # -------------------------------------------------------------
-# 4. DANH SÁCH ĐIỂM CẦN GHÉ QUA (TQGP0xx)
+# 5. DANH SÁCH ĐIỂM CẦN GHÉ QUA (TQGP0xx)
 # -------------------------------------------------------------
 st.sidebar.header("📋 Danh sách điểm ghé (TQGP0xx)")
 selected_from_list = st.sidebar.multiselect(
@@ -231,7 +250,7 @@ final_selected_names = list(set(selected_from_list + excel_points))
 
 
 # -------------------------------------------------------------
-# 5. THUẬT TOÁN ĐIỀU HƯỚNG OSRM VÀ SẮP XẾP LỘ TRÌNH
+# 6. THUẬT TOÁN OSRM VÀ XỬ LÝ ĐIỀU HƯỚNG
 # -------------------------------------------------------------
 def get_route_osrm(coords_list):
     formatted_coords = ";".join([f"{lon},{lat}" for lat, lon in coords_list])
@@ -275,7 +294,7 @@ def solve_tsp_from_gps(gps_coords, intermediate_points, end_point=None):
 
 
 # -------------------------------------------------------------
-# 6. HÀM TẠO BẢN ĐỒ KÈM NÚT MENU TẮT/MỞ SIDEBAR TRÊN MAP
+# 7. TẠO BẢN ĐỒ VỚI NÚT MENU TẮT/MỞ SIDEBAR CHUẨN VỊ TRÍ
 # -------------------------------------------------------------
 def create_map_with_menu_button(location, zoom=14):
     m = folium.Map(
@@ -293,20 +312,20 @@ def create_map_with_menu_button(location, zoom=14):
         strings={"title": "Định vị vị trí của tôi"},
     ).add_to(m)
 
-    # Nút Custom HTML/JS Menu Tắt/Mở Sidebar ngay trên Màn hình Map
+    # Nút Menu tách rời hẳn bên dưới cụm GPS (dời vị trí xuống top: 130px)
     menu_button_html = """
-    <div style="position: fixed; top: 80px; left: 12px; z-index: 9999;">
-        <button onclick="toggleSidebar()" style="
+    <div style="position: fixed; top: 130px; left: 10px; z-index: 9999;">
+        <button onclick="triggerToggleSidebar()" style="
             background-color: #00ffcc;
             color: #000000;
             border: 2px solid #00ffcc;
             border-radius: 50%;
-            width: 44px;
-            height: 44px;
-            font-size: 20px;
+            width: 34px;
+            height: 34px;
+            font-size: 18px;
             font-weight: bold;
             cursor: pointer;
-            box-shadow: 0 0 12px #00ffcc, 0 0 20px rgba(0,255,204,0.6);
+            box-shadow: 0 0 10px #00ffcc, 0 0 15px rgba(0,255,204,0.6);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -316,15 +335,8 @@ def create_map_with_menu_button(location, zoom=14):
         </button>
     </div>
     <script>
-    function toggleSidebar() {
-        var sidebarCloseBtn = window.parent.document.querySelector('button[aria-label="Close sidebar"]');
-        var sidebarOpenBtn = window.parent.document.querySelector('button[aria-label="Open sidebar"]');
-        
-        if (sidebarCloseBtn) {
-            sidebarCloseBtn.click();
-        } else if (sidebarOpenBtn) {
-            sidebarOpenBtn.click();
-        }
+    function triggerToggleSidebar() {
+        window.parent.postMessage({ type: "TOGGLE_SIDEBAR" }, "*");
     }
     </script>
     """
@@ -333,7 +345,7 @@ def create_map_with_menu_button(location, zoom=14):
 
 
 # -------------------------------------------------------------
-# 7. XỬ LÝ SỰ KIỆN TÍNH TOÁN
+# 8. XỬ LÝ NÚT TÍNH TOÁN
 # -------------------------------------------------------------
 if "calculated_route" not in st.session_state:
     st.session_state.calculated_route = None
@@ -363,7 +375,7 @@ if st.sidebar.button("🚀 Tối ưu đường đi XE MÁY"):
 
 
 # -------------------------------------------------------------
-# 8. HIỂN THỊ BẢN ĐỒ VIEW MAP
+# 9. HIỂN THỊ BẢN ĐỒ VIEW MAP
 # -------------------------------------------------------------
 if st.session_state.calculated_route is not None:
     optimized_route = st.session_state.calculated_route
@@ -381,7 +393,7 @@ if st.session_state.calculated_route is not None:
 
     m = create_map_with_menu_button([s_lat, s_lon], zoom=14)
 
-    # Xuất phát GPS
+    # GPS Xuất phát
     folium.Marker(
         [s_lat, s_lon],
         popup="Vị trí GPS của bạn (Xuất phát)",
@@ -389,7 +401,7 @@ if st.session_state.calculated_route is not None:
         icon=folium.Icon(color="green", icon="user", prefix="fa"),
     ).add_to(m)
 
-    # Các điểm ghé & đích đến
+    # Đánh số thứ tự các điểm dừng
     for idx, point in enumerate(optimized_route, start=1):
         p_lat, p_lon = point["lat"], point["lon"]
         is_end = idx == len(optimized_route) and end_location is not None
