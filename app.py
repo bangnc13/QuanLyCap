@@ -84,6 +84,11 @@ st.markdown(
         height: 22px !important;
     }
 
+    /* ĐẨY CỤM NÚT ZOOM (+ -) VÀ GPS XUỐNG DƯỚI */
+    .leaflet-top.leaflet-left .leaflet-control-zoom {
+        margin-top: 130px !important;
+    }
+
     /* NÚT LOCATE CONTROL (GPS NEON) */
     .leaflet-control-locate a {
         background-color: #00ffcc !important;
@@ -199,7 +204,7 @@ unique_keys = sorted(list(all_points.keys()))
 # -------------------------------------------------------------
 st.sidebar.header(" Make by BangNC13")
 search_query = st.sidebar.text_input(
-    "Nhập điểm cuối hành trình (nếu muốn)",
+    "Nhập điểm cuối hành trình",
     placeholder="Ví dụ: Bệnh viện đa khoa, Chợ Tam Cờ...",
 )
 
@@ -395,7 +400,7 @@ if st.session_state.calculated_route is not None:
 
     st.sidebar.markdown("---")
     st.sidebar.success(
-        f"📊 Tổng quãng đường xe máy: **~ {real_distance:.2f} km**"
+        f"📊 **Lộ trình xuất phát từ GPS của bạn**\n\nTổng quãng đường xe máy: **~ {real_distance:.2f} km**"
     )
 
     m = build_map([s_lat, s_lon], zoom=14)
