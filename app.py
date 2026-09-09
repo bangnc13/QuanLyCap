@@ -79,11 +79,12 @@ st.markdown(
         height: 22px !important;
     }
 
-    /* ĐƯA NÚT GPS XUỐNG CẠNH DƯỚI BÊN PHẢI MÀN HÌNH MAP */
+    /* ÉP CỐ ĐỊNH NÚT GPS XUỐNG CẠNH DƯỚI BÊN PHẢI */
+    .leaflet-bottom.leaflet-right .leaflet-control-locate,
     .leaflet-control-locate {
         position: fixed !important;
-        bottom: 30px !important;
-        right: 15px !important;
+        bottom: 40px !important;
+        right: 20px !important;
         top: auto !important;
         left: auto !important;
         z-index: 99999 !important;
@@ -351,7 +352,9 @@ def build_map(location, zoom=14):
         zoom_control=False,
     )
 
+    # Đã sửa position="bottomright" để đưa sang góc dưới bên phải
     LocateControl(
+        position="bottomright",
         auto_start=False,
         flyTo=True,
         keepCurrentZoomLevel=True,
