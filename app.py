@@ -1,8 +1,6 @@
 import json
 import os
-import re
 import folium
-import numpy as np
 import pandas as pd
 import requests
 import streamlit as st
@@ -14,11 +12,11 @@ st.set_page_config(
     page_title="Tối ưu đường di chuyển xe máy", layout="wide"
 )
 
-# Thêm tiêu đề chính vào thanh Menu bên trái
+# Sidebar Title
 st.sidebar.title("🏍️ Tối ưu hóa quãng đường di chuyển (Xe máy)")
 
 
-# 1. Đọc file GeoJSON và chỉ lọc các điểm định dạng TQGP0xx
+# 1. Đọc file GeoJSON & lọc điểm TQGP0xx
 @st.cache_data
 def load_geojson(file_path):
     if not os.path.exists(file_path):
@@ -41,7 +39,6 @@ def load_geojson(file_path):
                     if isinstance(val, (str, int))
                 ]
                 for p_name in possible_names:
-                    # Lọc chỉ lấy các tên có định dạng TQGP0...
                     if p_name and "TQGP0" in p_name.upper():
                         points[p_name] = {"lat": coords[1], "lon": coords[0]}
     return points
@@ -49,36 +46,56 @@ def load_geojson(file_path):
 
 GEOJSON_FILE = "data.geojson"
 all_points = load_geojson(GEOJSON_FILE)
-
-if not all_points:
-    st.sidebar.error(
-        f"⚠️ Không tìm thấy điểm nào dạng 'TQGP0xx' trong '{GEOJSON_FILE}'!"
-    )
-
 unique_keys = sorted(list(all_points.keys()))
 
-# 2. Vị trí xuất phát: Chọn từ danh sách GeoJSON (đã lọc TQGP0)
-st.sidebar.header("📍 Chọn điểm xuất phát")
-start_point_name = st.sidebar.selectbox(
-    "Chọn điểm xuất phát:",
-    options=unique_keys,
-    index=0 if unique_keys else None,
+# 2. Tính năng Tìm kiếm địa điểm (Sử dụng Nominatim Geocoding - Chuẩn Google Search)
+st.sidebar.header("🔍 Tìm kiếm Điểm Kết Thúc (Đích đến)")
+search_query = st.sidebar.text_input(
+    "Nhập tên địa điểm/địa chỉ cần đến:",
+    placeholder="Ví dụ: Bệnh viện đa khoa Tuyên Quang",
 )
 
-if start_point_name:
-    start_lat = all_points[start_point_name]["lat"]
-    start_lon = all_points[start_point_name]["lon"]
-else:
-    start_lat, start_lon = 21.82714, 105.19952
+end_location = None
+if search_query:
+    headers = {"User-Agent": "Streamlit_Route_Planner_App"}
+    url = f"https://nominatim.openstreetmap.org/search?q={search_query}&format=json&limit=5&countrycodes=vn"
 
-st.sidebar.header("📋 Danh sách tập điểm cần đến")
+    try:
+        response = requests.get(url, headers=headers, timeout=5)
+        results = response.json()
 
+        if results:
+            options = {
+                f"{item['display_name'][:50]}...": (
+                    float(item["lat"]),
+                    float(item["lon"]),
+                    item["display_name"],
+                )
+                for item in results
+            }
+            selected_option = st.sidebar.selectbox(
+                "Chọn chính xác địa điểm:", list(options.keys())
+            )
+            lat, lon, full_name = options[selected_option]
+            end_location = {
+                "name": f"ĐÍCH ĐẾN: {search_query}",
+                "lat": lat,
+                "lon": lon,
+            }
+            st.sidebar.success(f"📍 Đã chọn đích: {search_query}")
+        else:
+            st.sidebar.error("Không tìm thấy địa điểm! Thử gõ tên rõ hơn.")
+    except Exception as e:
+        st.sidebar.error(f"Lỗi tìm kiếm địa điểm: {e}")
+
+# 3. Chọn Danh sách tập điểm cần ghé qua (TQGP0xx)
+st.sidebar.header("📋 Danh sách tập điểm cần ghé qua (TQGP0xx)")
 selected_from_list = st.sidebar.multiselect(
-    "Chọn các điểm cần đến (TQGP0xx):", options=unique_keys
+    "Chọn các điểm TQGP0xx:", options=unique_keys
 )
 
 uploaded_file = st.sidebar.file_uploader(
-    "Hoặc Upload file Excel chứa danh sách điểm:", type=["xlsx", "xls"]
+    "Hoặc Upload file Excel:", type=["xlsx", "xls"]
 )
 excel_points = []
 
@@ -92,7 +109,6 @@ if uploaded_file:
             if not val_clean or val_clean == "nan":
                 continue
 
-            # Chỉ giữ lại giá trị phù hợp định dạng TQGP0
             if "TQGP0" in val_clean.upper():
                 if val_clean in all_points:
                     excel_points.append(val_clean)
@@ -108,18 +124,15 @@ if uploaded_file:
                             excel_points.append(prefix_match)
 
         st.sidebar.info(
-            f"Tìm thấy {len(excel_points)} điểm TQGP0xx hợp lệ từ file Excel."
+            f"Tìm thấy {len(excel_points)} điểm TQGP0xx từ file Excel."
         )
     except Exception as e:
         st.sidebar.error(f"Lỗi đọc file Excel: {e}")
 
 final_selected_names = list(set(selected_from_list + excel_points))
-# Loại bỏ điểm xuất phát khỏi danh sách điểm đến nếu bị trùng
-if start_point_name in final_selected_names:
-    final_selected_names.remove(start_point_name)
 
 
-# 3. Hàm OSRM chỉ đường xe máy
+# 4. Thuật toán OSRM & Tối ưu hóa lộ trình (Kết thúc tại điểm Search)
 def get_route_osrm(coords_list):
     formatted_coords = ";".join([f"{lon},{lat}" for lat, lon in coords_list])
     url = f"http://router.project-osrm.org/route/v1/bike/{formatted_coords}?overview=full&geometries=geojson"
@@ -141,8 +154,9 @@ def get_route_osrm(coords_list):
     return [[lat, lon] for lat, lon in coords_list], total_dist
 
 
-def solve_tsp(start_coords, points):
-    unvisited = points.copy()
+def solve_tsp_with_end(start_coords, intermediate_points, end_point=None):
+    """Sắp xếp tối ưu các điểm trung gian và cố định điểm kết thúc ở cuối."""
+    unvisited = intermediate_points.copy()
     current_pos = start_coords
     route = []
 
@@ -155,34 +169,53 @@ def solve_tsp(start_coords, points):
         current_pos = (nearest["lat"], nearest["lon"])
         unvisited.remove(nearest)
 
+    # Thêm điểm kết thúc (tìm kiếm) vào cuối cùng lộ trình nếu có
+    if end_point:
+        route.append(end_point)
+
     return route
 
 
-# 4. Quản lý trạng thái Session State
+# 5. Xử lý Sự kiện Bấm Button
 if "calculated_route" not in st.session_state:
     st.session_state.calculated_route = None
 
 if st.sidebar.button("🚀 Tối ưu đường đi XE MÁY"):
-    if not final_selected_names:
-        st.sidebar.warning("Vui lòng chọn hoặc upload ít nhất 1 điểm!")
+    if not final_selected_names and not end_location:
+        st.sidebar.warning(
+            "Vui lòng chọn ít nhất 1 điểm TQGP0xx hoặc nhập Điểm Kết Thúc!"
+        )
     else:
         with st.spinner("Đang tính toán lộ trình xe máy..."):
-            target_points = [
+            # Lấy điểm đầu tiên trong danh sách làm điểm xuất phát mặc định
+            if final_selected_names:
+                start_name = final_selected_names[0]
+                start_coords = (
+                    all_points[start_name]["lat"],
+                    all_points[start_name]["lon"],
+                )
+                intermediate_names = final_selected_names[1:]
+            else:
+                start_coords = (21.82714, 105.19952)
+                start_name = "Xuất phát"
+                intermediate_names = []
+
+            intermediate_points = [
                 {
                     "name": name,
                     "lat": all_points[name]["lat"],
                     "lon": all_points[name]["lon"],
                 }
-                for name in final_selected_names
+                for name in intermediate_names
             ]
-            start_coords = (start_lat, start_lon)
-            st.session_state.calculated_route = solve_tsp(
-                start_coords, target_points
+
+            st.session_state.calculated_route = solve_tsp_with_end(
+                start_coords, intermediate_points, end_location
             )
             st.session_state.start_coords = start_coords
-            st.session_state.start_name = start_point_name
+            st.session_state.start_name = start_name
 
-# Tính toán & Hiển thị thông số kết quả sang Sidebar
+# 6. Hiển thị Lộ trình & Bản đồ Google Maps
 if st.session_state.calculated_route is not None:
     optimized_route = st.session_state.calculated_route
     s_lat, s_lon = st.session_state.start_coords
@@ -196,10 +229,10 @@ if st.session_state.calculated_route is not None:
     # Đưa kết quả lộ trình vào sidebar trái
     st.sidebar.markdown("---")
     st.sidebar.success(
-        f"📊 **Lộ trình xe máy tối ưu**\n\nQuãng đường thực tế: **~ {real_distance:.2f} km**"
+        f"📊 **Lộ trình xe máy tối ưu**\n\nTổng quãng đường: **~ {real_distance:.2f} km**"
     )
 
-    # Khởi tạo bản đồ Google Maps Đường phố
+    # Tạo bản đồ Google Maps
     m = folium.Map(
         location=[s_lat, s_lon],
         zoom_start=14,
@@ -220,34 +253,35 @@ if st.session_state.calculated_route is not None:
         [s_lat, s_lon],
         popup=f"Xuất phát: {s_name}",
         tooltip=f"Xuất phát: {s_name}",
-        icon=folium.Icon(color="red", icon="info-sign"),
+        icon=folium.Icon(color="green", icon="play"),
     ).add_to(m)
 
-    # Marker điểm đến theo thứ tự (Xanh)
+    # Marker các điểm intermediate & Điểm kết thúc
     for idx, point in enumerate(optimized_route, start=1):
         p_lat, p_lon = point["lat"], point["lon"]
+        is_end = idx == len(optimized_route) and end_location is not None
+        bg_color = "#e63946" if is_end else "#0078ff"
+
         folium.Marker(
             [p_lat, p_lon],
             popup=f"Bước {idx}: {point['name']}",
             tooltip=f"{idx}. {point['name']}",
             icon=folium.DivIcon(
-                html=f'<div style="font-size: 10pt; font-weight: bold; color: white; background-color: #0078ff; border: 2px solid white; border-radius: 50%; width: 26px; height: 26px; text-align: center; line-height: 22px;">{idx}</div>'
+                html=f'<div style="font-size: 10pt; font-weight: bold; color: white; background-color: {bg_color}; border: 2px solid white; border-radius: 50%; width: 28px; height: 28px; text-align: center; line-height: 24px;">{idx}</div>'
             ),
         ).add_to(m)
 
-    # Đường chỉ dẫn xe máy
+    # Đường xe máy màu đỏ uốn lượn
     folium.PolyLine(
         detailed_path, color="#e63946", weight=5, opacity=0.85
     ).add_to(m)
 
     m.fit_bounds(stopping_coords)
-
-    # Hiển thị View Map tràn viền góc phải màn hình
     st_folium(m, use_container_width=True, height=850, returned_objects=[])
 else:
-    # Màn hình chờ mặc định khi chưa bấm tính toán
+    # Màn hình mặc định khi chưa bấm tính toán
     m_default = folium.Map(
-        location=[start_lat, start_lon],
+        location=[21.82714, 105.19952],
         zoom_start=13,
         tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
         attr="Google Maps",
