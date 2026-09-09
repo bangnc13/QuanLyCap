@@ -17,38 +17,33 @@ st.set_page_config(
 )
 
 # -------------------------------------------------------------
-# 1. CSS ÉP BẢN ĐỒ FULL TRÀN CẠNH DƯỚI & TÙY CHỈNH VỊ TRÍ NÚT ZOOM (+ -)
+# 1. CSS ÉP BẢN ĐỒ TRÀN MÀN HÌNH (100vh) & ĐỊNH DẠNG NÚT MENU NEON
 # -------------------------------------------------------------
 st.markdown(
     """
     <style>
-    /* 1. Xóa toàn bộ padding/margin để tràn full 100% cạnh dưới màn hình */
-    html, body, [data-testid="stAppViewContainer"], .main, .block-container, [data-testid="stMain"] {
+    /* Xóa sạch padding, margin thừa của Streamlit */
+    html, body, [data-testid="stAppViewContainer"], .main, .block-container {
         padding: 0 !important;
         margin: 0 !important;
         height: 100vh !important;
-        max-height: 100vh !important;
         overflow: hidden !important;
     }
-
-    /* Ép thẻ iframe chứa bản đồ kéo dài đụng đáy màn hình */
-    iframe {
-        height: 100vh !important;
-        min-height: 100vh !important;
-        width: 100vw !important;
+    
+    /* Mở rộng container chứa bản đồ full 100% chiều cao */
+    [data-testid="stVerticalBlock"] {
+        gap: 0rem !important;
     }
     
-    [data-testid="stElementToolbar"] {
-        display: none !important;
-    }
-
+    /* Hide Header mặc định của Streamlit để đụng trần sát mép trên */
     header[data-testid="stHeader"] {
         height: 0px !important;
         background: transparent !important;
         z-index: 99999 !important;
     }
 
-    /* 2. Định dạng nút 3 gạch Streamlit (nút Toggle Menu) */
+    /* Đội lốt nút ẩn/mở Sidebar gốc của Streamlit (nút '>>' / '<<') 
+       thành NÚT 3 GẠCH BO TRÒN MÀU XANH NEON */
     [data-testid="collapsedControl"],
     button[aria-label="Close sidebar"],
     button[aria-label="Open sidebar"] {
@@ -74,6 +69,7 @@ st.markdown(
         background-color: #00e6b8 !important;
     }
 
+    /* Đổi icon bên trong thành biểu tượng sắc nét */
     [data-testid="collapsedControl"] svg,
     button[aria-label="Close sidebar"] svg,
     button[aria-label="Open sidebar"] svg {
@@ -334,48 +330,23 @@ if st.sidebar.button("🚀 Tối ưu đường đi XE MÁY"):
 
 
 # -------------------------------------------------------------
-# 8. HIỂN THỊ BẢN ĐỒ VỚI NÚT ZOOM DI CHUYỂN XUỐNG CẠNH DƯỚI
+# 8. HIỂN THỊ BẢN ĐỒ VIEW MAP (FULL 100vh TRÀN VIỀN)
 # -------------------------------------------------------------
 def build_map(location, zoom=14):
-    # Tắt zoom_control mặc định ở đỉnh trên để chuyển xuống dưới
     m = folium.Map(
         location=location,
         zoom_start=zoom,
         tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
         attr="Google Maps",
-        zoom_control=False,
+        zoom_control=True,
     )
 
-    # Đặt nút định vị GPS ở góc trên bên trái
     LocateControl(
         auto_start=False,
         flyTo=True,
         keepCurrentZoomLevel=True,
         strings={"title": "Định vị vị trí của tôi"},
     ).add_to(m)
-
-    # CSS + JS chuyển cụm nút Zoom (+ -) xuống góc dưới bên trái
-    zoom_bottom_css = """
-    <style>
-    .leaflet-control-zoom {
-        position: fixed !important;
-        bottom: 30px !important;
-        left: 12px !important;
-        top: auto !important;
-        z-index: 99999 !important;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.3) !important;
-    }
-    </style>
-    """
-    m.get_root().html.add_child(folium.Element(zoom_bottom_css))
-
-    # Khởi tạo lại nút Zoom ở vị trí mới
-    folium.plugins.FloatImage
-    m.add_child(folium.Element("""
-    <script>
-    L.control.zoom({ position: 'bottomleft' }).addTo(map);
-    </script>
-    """))
 
     return m
 
@@ -422,7 +393,8 @@ if st.session_state.calculated_route is not None:
     ).add_to(m)
 
     m.fit_bounds(stopping_coords)
-    st_folium(m, use_container_width=True, height=1200, returned_objects=[])
+    # 100vh ép bản đồ tràn kín màn hình trên & dưới
+    st_folium(m, use_container_width=True, height=1000, returned_objects=[])
 else:
     m_default = build_map([curr_lat, curr_lon], zoom=14)
     folium.Marker(
@@ -433,5 +405,5 @@ else:
     ).add_to(m_default)
 
     st_folium(
-        m_default, use_container_width=True, height=1200, returned_objects=[]
+        m_default, use_container_width=True, height=1000, returned_objects=[]
     )
