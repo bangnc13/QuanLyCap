@@ -242,7 +242,7 @@ if search_query:
 
 
 # -------------------------------------------------------------
-# 6. DANH SÁCH ĐIỂM CẦN GHÉ QUA (TQGP0xx) & CẤU HÌNH HIỂN THỊ
+# 6. DANH SÁCH ĐIỂM CẦN GHÉ QUA (TQGP0xx)
 # -------------------------------------------------------------
 st.sidebar.header("📋 Chọn lộ trình di chuyển")
 selected_from_list = st.sidebar.multiselect(
@@ -283,9 +283,6 @@ if uploaded_file:
         st.sidebar.error(f"Lỗi đọc file Excel: {e}")
 
 final_selected_names = list(set(selected_from_list + excel_points))
-
-# Nút công tắc ẩn/hiện tên tập điểm trên Map
-show_labels = st.sidebar.toggle("🏷️ Hiển thị tên điểm trên bản đồ", value=True)
 
 
 # -------------------------------------------------------------
@@ -381,7 +378,6 @@ def build_map(location, zoom=14):
         strings={"title": "Định vị vị trí của tôi"},
     ).add_to(m)
 
-    # CSS + JavaScript Inject từ trong IFRAME ra ngoài trang PARENT để buộc nút '>>' phải nhấp nháy
     custom_script = """
     <style>
     .leaflet-top.leaflet-left {
@@ -441,7 +437,11 @@ if st.session_state.calculated_route is not None:
     ]
     detailed_path, real_distance = get_route_osrm(stopping_coords)
 
+    # Đặt công tắc hiển thị nhãn tên điểm ngay trên kết quả tính toán ở Sidebar
     st.sidebar.markdown("---")
+    st.sidebar.subheader("⚙️ Tùy chỉnh hiển thị")
+    show_labels = st.sidebar.checkbox("🏷️ Hiện tên điểm trên map", value=True)
+
     st.sidebar.success(
         f"📊 Tổng quãng đường xe máy: **~ {real_distance:.2f} km**"
     )
@@ -459,7 +459,7 @@ if st.session_state.calculated_route is not None:
         is_end = idx == len(optimized_route) and end_location is not None
         bg_color = "#e63946" if is_end else "#0078ff"
 
-        # Kiểm tra biến show_labels để quyết định hiển thị nhãn tên hay chỉ hiển thị bóng tròn số
+        # Nếu tick chọn "Hiện tên điểm trên map", render tên thẻ trắng bên cạnh icon
         if show_labels:
             marker_html = f"""
             <div style="display: flex; align-items: center; white-space: nowrap;">
