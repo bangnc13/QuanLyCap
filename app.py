@@ -9,9 +9,9 @@ from folium.plugins import LocateControl
 from geopy.distance import geodesic
 from streamlit_folium import st_folium
 
-# Thiết lập cấu hình trang
+# Cấu hình trang Streamlit
 st.set_page_config(
-    page_title="Tối ưu đường di chuyển xe máy - Google Maps Style",
+    page_title="Tối ưu đường di chuyển xe máy - Google Blue Style",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -24,7 +24,7 @@ if os.path.exists(logo_path):
     st.sidebar.image(logo_path, use_container_width=True)
 
 # -------------------------------------------------------------
-# 2. CSS HIỆU ỨNG NÚT SIDEBAR
+# 2. CSS HIỆU ỨNG NÚT SIDEBAR & GIAO DIỆN
 # -------------------------------------------------------------
 st.markdown(
     """
@@ -283,50 +283,52 @@ st.sidebar.subheader("⚙️ Tùy chỉnh hiển thị BẢN ĐỒ")
 show_labels = st.sidebar.checkbox("🏷️ Hiện tên điểm (Label)", value=True)
 show_route_line = st.sidebar.checkbox("🛣️ Hiện đường vẽ lộ trình", value=True)
 
+if st.sidebar.button("🔄 Làm mới bản đồ / Xóa lộ trình"):
+    st.session_state.calculated_route = None
+    st.rerun()
+
 # -------------------------------------------------------------
-# 8. THUẬT TOÁN ĐỊNH TUYẾN TỐI ƯU GOOGLE MAPS STYLE
+# 8. THUẬT TOÁN ĐỊNH TUYẾN CHÍNH XÁC VÀO TÂM MARKER (MÀU XANH DƯƠNG)
 # -------------------------------------------------------------
-def get_google_maps_style_route(coords_list):
+def get_accurate_blue_route(coords_list):
     """
-    Kết nối liên tục các điểm dừng. Ép điểm đầu và điểm cuối của từng leg
-    chạy chính xác vào vị trí tọa độ Marker mong muốn.
+    Tạo chuỗi đường đi mượt mà nối thẳng vào tâm Marker bằng màu Xanh Dương Google Maps.
     """
-    unified_route = []
-    total_distance = 0.0
+    complete_line = []
+    total_dist = 0.0
 
     for i in range(len(coords_list) - 1):
         p1 = coords_list[i]
         p2 = coords_list[i + 1]
 
-        # Gọi OSRM routing
-        url = f"http://router.project-osrm.org/route/v1/driving/{p1[1]},{p1[0]};{p2[1]},{p2[0]}?overview=full&geometries=geojson"
+        # Gọi OSRM Foot/Bike để mở rộng lối đi nhỏ dẫn thẳng tới Marker
+        url = f"http://router.project-osrm.org/route/v1/foot/{p1[1]},{p1[0]};{p2[1]},{p2[0]}?overview=full&geometries=geojson"
 
-        leg_coords = []
+        segment = []
         try:
-            res = requests.get(url, timeout=5)
+            res = requests.get(url, timeout=4)
             data = res.json()
             if data.get("code") == "Ok":
                 geom = data["routes"][0]["geometry"]["coordinates"]
-                leg_coords = [[lat, lon] for lon, lat in geom]
-                total_distance += data["routes"][0]["distance"] / 1000.0
+                segment = [[lat, lon] for lon, lat in geom]
+                total_dist += data["routes"][0]["distance"] / 1000.0
         except Exception:
             pass
 
-        if not leg_coords:
-            leg_coords = [[p1[0], p1[1]], [p2[0], p2[1]]]
-            total_distance += geodesic(p1, p2).km
+        if not segment:
+            segment = [[p1[0], p1[1]], [p2[0], p2[1]]]
+            total_dist += geodesic(p1, p2).km
 
-        # BẮT BUỘC: Đầu chặng phải = p1, Cuối chặng phải = p2 (Tâm Marker)
-        leg_coords[0] = [p1[0], p1[1]]
-        leg_coords[-1] = [p2[0], p2[1]]
+        # Ép tâm tọa độ Marker vào đầu và cuối mỗi segment
+        segment[0] = [p1[0], p1[1]]
+        segment[-1] = [p2[0], p2[1]]
 
-        # Ghép vào chuỗi đường đi liên tục
-        if not unified_route:
-            unified_route.extend(leg_coords)
+        if not complete_line:
+            complete_line.extend(segment)
         else:
-            unified_route.extend(leg_coords[1:])
+            complete_line.extend(segment[1:])
 
-    return unified_route, total_distance
+    return complete_line, total_dist
 
 
 def solve_tsp_from_gps(gps_coords, intermediate_points, end_point=None):
@@ -360,7 +362,7 @@ if st.sidebar.button("🚀 Lộ trình "):
             "Vui lòng chọn điểm TQGP0xx hoặc nhập Điểm Kết Thúc!"
         )
     else:
-        with st.spinner("Đang tối ưu các điểm dừng như Google Maps..."):
+        with st.spinner("Đang tối ưu lộ trình xe máy (Màu xanh dương)..."):
             gps_start_coords = (curr_lat, curr_lon)
 
             intermediate_points = [
@@ -451,7 +453,7 @@ if st.session_state.calculated_route is not None:
         (p["lat"], p["lon"]) for p in optimized_route
     ]
 
-    full_path, real_distance = get_google_maps_style_route(stopping_coords)
+    blue_path, real_distance = get_accurate_blue_route(stopping_coords)
 
     st.sidebar.success(
         f"📊 Tổng quãng đường xe máy: **~ {real_distance:.2f} km**"
@@ -466,11 +468,11 @@ if st.session_state.calculated_route is not None:
         icon=folium.Icon(color="green", icon="user", prefix="fa"),
     ).add_to(m)
 
-    # Đặt các Marker điểm dừng Google Maps
+    # Đặt các Marker điểm dừng
     for idx, point in enumerate(optimized_route, start=1):
         p_lat, p_lon = point["lat"], point["lon"]
         is_end = idx == len(optimized_route) and end_location is not None
-        bg_color = "#e63946" if is_end else "#0078ff"
+        bg_color = "#e63946" if is_end else "#1A73E8"
 
         if show_labels:
             marker_html = f"""
@@ -491,14 +493,14 @@ if st.session_state.calculated_route is not None:
             icon=folium.DivIcon(html=marker_html),
         ).add_to(m)
 
-    # VẼ TUYẾN ĐƯỜNG ĐỎ LIÊN TỤC VÀO TẬN TÂM MARKER
+    # VẼ TUYẾN ĐƯỜNG MÀU XANH DƯƠNG CHÍNH XÁC CỦA GOOGLE MAPS (#1A73E8)
     if show_route_line:
         folium.PolyLine(
-            full_path, color="#ea4335", weight=6, opacity=0.85
+            blue_path, color="#1A73E8", weight=6, opacity=0.9
         ).add_to(m)
 
     m.fit_bounds(stopping_coords)
-    st_folium(m, use_container_width=True, height=1000, returned_objects=[])
+    st_folium(m, use_container_width=True, height=1000, key="map_route_active")
 else:
     m_default = build_map([curr_lat, curr_lon], zoom=14)
 
@@ -509,5 +511,8 @@ else:
     ).add_to(m_default)
 
     st_folium(
-        m_default, use_container_width=True, height=1000, returned_objects=[]
+        m_default,
+        use_container_width=True,
+        height=1000,
+        key="map_default_active",
     )
