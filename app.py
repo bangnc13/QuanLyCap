@@ -117,7 +117,7 @@ st.markdown(
 )
 
 # -------------------------------------------------------------
-# 3. GPS REALTIME
+# 3. GPS REALTIME TỪ THIẾT BỊ
 # -------------------------------------------------------------
 gps_code = """
 <script>
@@ -150,7 +150,7 @@ curr_lat = st.session_state.user_gps["lat"]
 curr_lon = st.session_state.user_gps["lon"]
 
 # -------------------------------------------------------------
-# 4. LOAD GEOJSON
+# 4. ĐỌC FILE GEOJSON
 # -------------------------------------------------------------
 @st.cache_data
 def load_geojson(file_path):
@@ -233,7 +233,7 @@ if search_query:
         st.sidebar.error(f"Lỗi tìm kiếm: {e}")
 
 # -------------------------------------------------------------
-# 6. DANH SÁCH ĐIỂM
+# 6. LỰA CHỌN TẬP ĐIỂM (TQGP0xx)
 # -------------------------------------------------------------
 st.sidebar.header("📋 Chọn lộ trình di chuyển")
 selected_from_list = st.sidebar.multiselect(
@@ -276,36 +276,49 @@ if uploaded_file:
 final_selected_names = list(set(selected_from_list + excel_points))
 
 # -------------------------------------------------------------
-# 7. THUẬT TOÁN OSRM & ĐIỀU HƯỚNG SỬA LỖI CHỆCH ĐIỂM
+# 7. XỬ LÝ OSRM ĐẢM BẢO ĐƯỜNG ĐI CHÍNH XÁC TỐI ĐA VÀO TÂM MARKER
 # -------------------------------------------------------------
 def get_route_osrm(coords_list):
-    """Lấy tuyến đường OSRM và tự động nối chính xác vào tọa độ gốc của Marker nếu đường bị hở"""
-    formatted_coords = ";".join([f"{lon},{lat}" for lat, lon in coords_list])
-    url = f"http://router.project-osrm.org/route/v1/driving/{formatted_coords}?overview=full&geometries=geojson"
-
+    """
+    Tính đường OSRM theo từng phân đoạn (leg) và tự động gắn khớp 
+    đầu/cuối của đường vẽ trực tiếp vào đúng tọa độ GPS của điểm.
+    """
     full_path = []
     total_distance = 0.0
 
-    try:
-        res = requests.get(url, timeout=10)
-        data = res.json()
-        if data.get("code") == "Ok":
-            route_geometry = data["routes"][0]["geometry"]["coordinates"]
-            osrm_path = [[lat, lon] for lon, lat in route_geometry]
-            total_distance = data["routes"][0]["distance"] / 1000.0
-
-            # Khắc phục chệch tọa độ bằng cách thêm đoạn nối trực tiếp đến điểm mốc
-            full_path = [list(coords_list[0])]
-            full_path.extend(osrm_path)
-            full_path.append(list(coords_list[-1]))
-            return full_path, total_distance
-    except Exception:
-        pass
-
-    # Backup nếu OSRM lỗi
     for i in range(len(coords_list) - 1):
-        total_distance += geodesic(coords_list[i], coords_list[i + 1]).km
-    return [[lat, lon] for lat, lon in coords_list], total_distance
+        p1 = coords_list[i]
+        p2 = coords_list[i + 1]
+
+        # URL truy vấn từng chặng ngắn
+        url = f"http://router.project-osrm.org/route/v1/driving/{p1[1]},{p1[0]};{p2[1]},{p2[0]}?overview=full&geometries=geojson"
+
+        leg_path = []
+        try:
+            res = requests.get(url, timeout=5)
+            data = res.json()
+            if data.get("code") == "Ok":
+                route_geom = data["routes"][0]["geometry"]["coordinates"]
+                leg_path = [[lat, lon] for lon, lat in route_geom]
+                total_distance += data["routes"][0]["distance"] / 1000.0
+        except Exception:
+            pass
+
+        # Nếu không lấy được OSRM thì vẽ đường thẳng giữa 2 điểm
+        if not leg_path:
+            leg_path = [[p1[0], p1[1]], [p2[0], p2[1]]]
+            total_distance += geodesic(p1, p2).km
+
+        # Khắc phục lỗi Snap lệch của OSRM: Bắt buộc đầu đường = p1, cuối đường = p2
+        leg_path[0] = [p1[0], p1[1]]
+        leg_path[-1] = [p2[0], p2[1]]
+
+        if not full_path:
+            full_path.extend(leg_path)
+        else:
+            full_path.extend(leg_path[1:])
+
+    return full_path, total_distance
 
 
 def solve_tsp_from_gps(gps_coords, intermediate_points, end_point=None):
@@ -328,7 +341,7 @@ def solve_tsp_from_gps(gps_coords, intermediate_points, end_point=None):
     return route
 
 # -------------------------------------------------------------
-# 8. XỬ LÝ NÚT TÍNH TOÁN
+# 8. XỬ LÝ NÚT TÍNH TOÁN LỘ TRÌNH
 # -------------------------------------------------------------
 if "calculated_route" not in st.session_state:
     st.session_state.calculated_route = None
@@ -339,7 +352,7 @@ if st.sidebar.button("🚀 Lộ trình "):
             "Vui lòng chọn điểm TQGP0xx hoặc nhập Điểm Kết Thúc!"
         )
     else:
-        with st.spinner("Đang tính toán lộ trình xe máy chính xác..."):
+        with st.spinner("Đang tối ưu lộ trình và ghép đường chính xác..."):
             gps_start_coords = (curr_lat, curr_lon)
 
             intermediate_points = [
@@ -357,7 +370,7 @@ if st.sidebar.button("🚀 Lộ trình "):
             st.session_state.start_coords = gps_start_coords
 
 # -------------------------------------------------------------
-# 9. HIỂN THỊ BẢN ĐỒ VIEW MAP
+# 9. DỰNG BẢN ĐỒ VÀ HIỂN THỊ
 # -------------------------------------------------------------
 def build_map(location, zoom=14):
     m = folium.Map(
@@ -431,11 +444,15 @@ if st.session_state.calculated_route is not None:
     ]
     detailed_path, real_distance = get_route_osrm(stopping_coords)
 
-    # ⚙️ TÙY CHỈNH HIỂN THỊ
+    # ⚙️ KHU VỰC TÙY CHỈNH HỂN THỊ TRÊN SIDEBAR
     st.sidebar.markdown("---")
     st.sidebar.subheader("⚙️ Tùy chỉnh hiển thị")
+    
+    # Nút 1: Ẩn/Hiện Tên tập điểm
     show_labels = st.sidebar.checkbox("🏷️ Hiện tên điểm trên map", value=True)
-    show_polyline = st.sidebar.checkbox("🛣️ Hiện lộ trình đường đi", value=True)
+    
+    # Nút 2: Ẩn/Hiện Đường lộ trình (PolyLine)
+    show_route_line = st.sidebar.checkbox("🛣️ Hiện đường lộ trình tuyến đường", value=True)
 
     st.sidebar.success(
         f"📊 Tổng quãng đường xe máy: **~ {real_distance:.2f} km**"
@@ -443,12 +460,14 @@ if st.session_state.calculated_route is not None:
 
     m = build_map([s_lat, s_lon], zoom=14)
 
+    # Vị trí xuất phát
     folium.Marker(
         [s_lat, s_lon],
         popup="Vị trí GPS của bạn (Xuất phát)",
         icon=folium.Icon(color="green", icon="user", prefix="fa"),
     ).add_to(m)
 
+    # Vẽ các Marker tập điểm
     for idx, point in enumerate(optimized_route, start=1):
         p_lat, p_lon = point["lat"], point["lon"]
         is_end = idx == len(optimized_route) and end_location is not None
@@ -473,8 +492,8 @@ if st.session_state.calculated_route is not None:
             icon=folium.DivIcon(html=marker_html),
         ).add_to(m)
 
-    # ĐIỀU KIỆN HIỂN THỊ LỘ TRÌNH ĐƯỜNG ĐI
-    if show_polyline:
+    # Kiểm tra checkbox: Nếu tích chọn mới vẽ PolyLine đường đi
+    if show_route_line:
         folium.PolyLine(
             detailed_path, color="#e63946", weight=5, opacity=0.85
         ).add_to(m)
