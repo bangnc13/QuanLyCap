@@ -17,19 +17,18 @@ st.set_page_config(
 )
 
 # -------------------------------------------------------------
-# 1. BỔ SUNG LOGO VÀO ĐẦU SIDEBAR (TRÊN CÙNG MENU)
+# 1. BỔ SUNG LOGO VÀO ĐẦU SIDEBAR
 # -------------------------------------------------------------
 logo_path = "FPT_Telecom_logo.png"
 if os.path.exists(logo_path):
     st.sidebar.image(logo_path, use_container_width=True)
 
 # -------------------------------------------------------------
-# 2. CSS BẮT BỘC NHẤP NHÁY NÚT OPEN SIDEBAR (>> ON MAP) & CLOSE SIDEBAR (<<)
+# 2. CSS HIỆU ỨNG NÚT SIDEBAR
 # -------------------------------------------------------------
 st.markdown(
     """
     <style>
-    /* Xóa sạch padding, margin thừa của Streamlit */
     html, body, [data-testid="stAppViewContainer"], .main, .block-container {
         padding: 0 !important;
         margin: 0 !important;
@@ -47,7 +46,6 @@ st.markdown(
         z-index: 99999 !important;
     }
 
-    /* ĐỊNH NGHĨA KEYFRAME CHỚP NHÁY BLINK SIÊU MẠNH */
     @keyframes neonBlinkGlow {
         0% {
             background-color: #00ffcc !important;
@@ -69,7 +67,6 @@ st.markdown(
         }
     }
 
-    /* ÉP TẤT CẢ BIẾN THỂ NÚT MỞ SIDEBAR (NÚT >> NẰM TRÊN BẢN ĐỒ) */
     [data-testid="collapsedControl"],
     [data-testid="stSidebarCollapsedControl"],
     [data-testid="stSidebarCollapsedControl"] button,
@@ -91,7 +88,6 @@ st.markdown(
         animation: neonBlinkGlow 1.2s infinite ease-in-out !important;
     }
 
-    /* NÚT ĐÓNG SIDEBAR (NÚT << NẰM TRONG MENU) */
     div[data-testid="stSidebarCollapseButton"] button,
     button[aria-label="Close sidebar"] {
         background-color: #00ffcc !important;
@@ -105,7 +101,6 @@ st.markdown(
         animation: neonBlinkGlow 1.2s infinite ease-in-out !important;
     }
 
-    /* ÉP ĐỔI MÀU ICON SVG BÊN TRONG THÀNH MÀU ĐEN CHO RÕ NÉT */
     [data-testid="collapsedControl"] svg,
     [data-testid="stSidebarCollapsedControl"] svg,
     button[aria-label="Open sidebar"] svg,
@@ -121,9 +116,8 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-
 # -------------------------------------------------------------
-# 3. BỘ LẤY TỌA ĐỘ GPS REALTIME TỪ ĐIỆN THOẠI (CHẠY NGẦM)
+# 3. GPS REALTIME
 # -------------------------------------------------------------
 gps_code = """
 <script>
@@ -155,9 +149,8 @@ if gps_data and isinstance(gps_data, dict) and "lat" in gps_data:
 curr_lat = st.session_state.user_gps["lat"]
 curr_lon = st.session_state.user_gps["lon"]
 
-
 # -------------------------------------------------------------
-# 4. ĐỌC GEOJSON LỌC TQGP0xx
+# 4. LOAD GEOJSON
 # -------------------------------------------------------------
 @st.cache_data
 def load_geojson(file_path):
@@ -190,9 +183,8 @@ GEOJSON_FILE = "data.geojson"
 all_points = load_geojson(GEOJSON_FILE)
 unique_keys = sorted(list(all_points.keys()))
 
-
 # -------------------------------------------------------------
-# 5. TÌM KIẾM ĐÍCH ĐẾN (TUYÊN QUANG)
+# 5. TÌM KIẾM ĐÍCH ĐẾN
 # -------------------------------------------------------------
 st.sidebar.header(" Make by BangNC13")
 search_query = st.sidebar.text_input(
@@ -240,9 +232,8 @@ if search_query:
     except Exception as e:
         st.sidebar.error(f"Lỗi tìm kiếm: {e}")
 
-
 # -------------------------------------------------------------
-# 6. DANH SÁCH ĐIỂM CẦN GHÉ QUA (TQGP0xx)
+# 6. DANH SÁCH ĐIỂM
 # -------------------------------------------------------------
 st.sidebar.header("📋 Chọn lộ trình di chuyển")
 selected_from_list = st.sidebar.multiselect(
@@ -284,29 +275,37 @@ if uploaded_file:
 
 final_selected_names = list(set(selected_from_list + excel_points))
 
-
 # -------------------------------------------------------------
-# 7. THUẬT TOÁN OSRM VÀ ĐIỀU HƯỚNG
+# 7. THUẬT TOÁN OSRM & ĐIỀU HƯỚNG SỬA LỖI CHỆCH ĐIỂM
 # -------------------------------------------------------------
 def get_route_osrm(coords_list):
+    """Lấy tuyến đường OSRM và tự động nối chính xác vào tọa độ gốc của Marker nếu đường bị hở"""
     formatted_coords = ";".join([f"{lon},{lat}" for lat, lon in coords_list])
-    url = f"http://router.project-osrm.org/route/v1/bike/{formatted_coords}?overview=full&geometries=geojson"
+    url = f"http://router.project-osrm.org/route/v1/driving/{formatted_coords}?overview=full&geometries=geojson"
+
+    full_path = []
+    total_distance = 0.0
 
     try:
         res = requests.get(url, timeout=10)
         data = res.json()
         if data.get("code") == "Ok":
             route_geometry = data["routes"][0]["geometry"]["coordinates"]
-            path = [[lat, lon] for lon, lat in route_geometry]
-            distance_km = data["routes"][0]["distance"] / 1000.0
-            return path, distance_km
+            osrm_path = [[lat, lon] for lon, lat in route_geometry]
+            total_distance = data["routes"][0]["distance"] / 1000.0
+
+            # Khắc phục chệch tọa độ bằng cách thêm đoạn nối trực tiếp đến điểm mốc
+            full_path = [list(coords_list[0])]
+            full_path.extend(osrm_path)
+            full_path.append(list(coords_list[-1]))
+            return full_path, total_distance
     except Exception:
         pass
 
-    total_dist = 0
+    # Backup nếu OSRM lỗi
     for i in range(len(coords_list) - 1):
-        total_dist += geodesic(coords_list[i], coords_list[i + 1]).km
-    return [[lat, lon] for lat, lon in coords_list], total_dist
+        total_distance += geodesic(coords_list[i], coords_list[i + 1]).km
+    return [[lat, lon] for lat, lon in coords_list], total_distance
 
 
 def solve_tsp_from_gps(gps_coords, intermediate_points, end_point=None):
@@ -328,7 +327,6 @@ def solve_tsp_from_gps(gps_coords, intermediate_points, end_point=None):
 
     return route
 
-
 # -------------------------------------------------------------
 # 8. XỬ LÝ NÚT TÍNH TOÁN
 # -------------------------------------------------------------
@@ -341,7 +339,7 @@ if st.sidebar.button("🚀 Lộ trình "):
             "Vui lòng chọn điểm TQGP0xx hoặc nhập Điểm Kết Thúc!"
         )
     else:
-        with st.spinner("Đang tính toán lộ trình xe máy..."):
+        with st.spinner("Đang tính toán lộ trình xe máy chính xác..."):
             gps_start_coords = (curr_lat, curr_lon)
 
             intermediate_points = [
@@ -357,7 +355,6 @@ if st.sidebar.button("🚀 Lộ trình "):
                 gps_start_coords, intermediate_points, end_location
             )
             st.session_state.start_coords = gps_start_coords
-
 
 # -------------------------------------------------------------
 # 9. HIỂN THỊ BẢN ĐỒ VIEW MAP
@@ -380,9 +377,7 @@ def build_map(location, zoom=14):
 
     custom_script = """
     <style>
-    .leaflet-top.leaflet-left {
-        top: 75px !important;
-    }
+    .leaflet-top.leaflet-left { top: 75px !important; }
     .leaflet-control-locate a {
         background-color: #00ffcc !important;
         border: 2px solid #00ffcc !important;
@@ -424,7 +419,6 @@ def build_map(location, zoom=14):
     </script>
     """
     m.get_root().html.add_child(folium.Element(custom_script))
-
     return m
 
 
@@ -437,10 +431,11 @@ if st.session_state.calculated_route is not None:
     ]
     detailed_path, real_distance = get_route_osrm(stopping_coords)
 
-    # Đặt công tắc hiển thị nhãn tên điểm ngay trên kết quả tính toán ở Sidebar
+    # ⚙️ TÙY CHỈNH HIỂN THỊ
     st.sidebar.markdown("---")
     st.sidebar.subheader("⚙️ Tùy chỉnh hiển thị")
     show_labels = st.sidebar.checkbox("🏷️ Hiện tên điểm trên map", value=True)
+    show_polyline = st.sidebar.checkbox("🛣️ Hiện lộ trình đường đi", value=True)
 
     st.sidebar.success(
         f"📊 Tổng quãng đường xe máy: **~ {real_distance:.2f} km**"
@@ -459,7 +454,6 @@ if st.session_state.calculated_route is not None:
         is_end = idx == len(optimized_route) and end_location is not None
         bg_color = "#e63946" if is_end else "#0078ff"
 
-        # Nếu tick chọn "Hiện tên điểm trên map", render tên thẻ trắng bên cạnh icon
         if show_labels:
             marker_html = f"""
             <div style="display: flex; align-items: center; white-space: nowrap;">
@@ -479,9 +473,11 @@ if st.session_state.calculated_route is not None:
             icon=folium.DivIcon(html=marker_html),
         ).add_to(m)
 
-    folium.PolyLine(
-        detailed_path, color="#e63946", weight=5, opacity=0.85
-    ).add_to(m)
+    # ĐIỀU KIỆN HIỂN THỊ LỘ TRÌNH ĐƯỜNG ĐI
+    if show_polyline:
+        folium.PolyLine(
+            detailed_path, color="#e63946", weight=5, opacity=0.85
+        ).add_to(m)
 
     m.fit_bounds(stopping_coords)
     st_folium(m, use_container_width=True, height=1000, returned_objects=[])
