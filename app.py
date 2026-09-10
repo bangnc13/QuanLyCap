@@ -161,11 +161,10 @@ if st.sidebar.button("🔄 Làm mới bản đồ"):
     st.rerun()
 
 # -------------------------------------------------------------
-# 5. THUẬT TOÁN TỐI ƯU VÀ KHỚP ĐƯỜNG BỘ CHÍNH XÁC (SNAP FIX)
+# 5. THUẬT TOÁN TỐI ƯU VÀ KHỚP ĐƯỜNG BỘ CHÍNH XÁC
 # -------------------------------------------------------------
 def get_distance_matrix(coords):
     loc_str = ";".join([f"{lon},{lat}" for lat, lon in coords])
-    # Ép OSRM cho phép tìm điểm trong bán kính 200m quanh tọa độ thực tế
     radiuses = ";".join(["200"] * len(coords))
     url = f"http://router.project-osrm.org/table/v1/driving/{loc_str}?annotations=distance&radiuses={radiuses}"
     try:
@@ -235,11 +234,6 @@ def solve_tsp_google_style(start_coord, points, end_coord=None):
     return ordered_points
 
 def fetch_osrm_segment_exact(pair):
-    """
-    Sửa lỗi đường thẳng:
-    Tăng bán kính tìm kiếm đường (radiuses=500) giúp tự động kéo tọa độ điểm TQGP
-    vào đường giao thông gần nhất để vẽ chuẩn bám lòng đường.
-    """
     p1, p2 = pair
     url = f"http://router.project-osrm.org/route/v1/driving/{p1[1]},{p1[0]};{p2[1]},{p2[0]}?overview=full&geometries=geojson&radiuses=500;500&continue_straight=false"
     try:
@@ -251,12 +245,10 @@ def fetch_osrm_segment_exact(pair):
             return geom, dist
     except Exception:
         pass
-    # Nếu không tìm thấy lộ trình OSRM, trả về đoạn nối mượt
     return [[p1[0], p1[1]], [p2[0], p2[1]]], 0.0
 
 def get_accurate_route_geometry_parallel(coords_list):
     pairs = [(coords_list[i], coords_list[i+1]) for i in range(len(coords_list)-1)]
-    
     road_lines = []
     total_dist = 0.0
     
@@ -270,7 +262,7 @@ def get_accurate_route_geometry_parallel(coords_list):
     return road_lines, total_dist
 
 # -------------------------------------------------------------
-# 6. TÍNH TOÁN & DỰNG BẢN ĐỒ
+# 6. TÍNH TOÁN & DỰNG BẢN ĐỒ VỚI THUẬT TOÁN ĐẢO HƯỚNG NHÃN
 # -------------------------------------------------------------
 if "calculated_route" not in st.session_state:
     st.session_state.calculated_route = None
@@ -281,18 +273,15 @@ if st.sidebar.button("🚀 Lộ trình"):
     if not final_selected_names and not end_location:
         st.sidebar.warning("Vui lòng chọn điểm TQGP0xx hoặc nhập Điểm Kết Thúc!")
     else:
-        with st.spinner("Đang ép khớp lộ trình bám khít đường giao thông..."):
+        with st.spinner("Đang xử lý vị trí điểm & chống chồng nhãn..."):
             gps_start = (curr_lat, curr_lon)
             pts = [{"name": name, "lat": all_points[name]["lat"], "lon": all_points[name]["lon"]} for name in final_selected_names]
             
-            # Tối ưu thứ tự
             opt_route = solve_tsp_google_style(gps_start, pts, end_location)
             stop_coords = [gps_start] + [(p["lat"], p["lon"]) for p in opt_route]
             
-            # Lấy lộ trình bám đường chính xác
             road_lines, real_dist = get_accurate_route_geometry_parallel(stop_coords)
             
-            # Cập nhật cache
             st.session_state.calculated_route = opt_route
             st.session_state.start_coords = gps_start
             st.session_state.route_cache = {
@@ -304,7 +293,7 @@ if st.sidebar.button("🚀 Lộ trình"):
 def build_map(center):
     m = folium.Map(
         location=center, 
-        zoom_start=15, 
+        zoom_start=16, 
         tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}", 
         attr="Google Maps"
     )
@@ -325,20 +314,65 @@ if st.session_state.calculated_route and st.session_state.route_cache:
     m = build_map([s_lat, s_lon])
     folium.Marker([s_lat, s_lon], popup="Xuất phát", icon=folium.Icon(color="green", icon="user", prefix="fa")).add_to(m)
 
+    # THUẬT TOÁN CHỐNG ĐÈ NHÃN (LABEL ANTI-OVERLAP)
+    num_pts = len(route)
     for idx, pt in enumerate(route, start=1):
-        is_end = idx == len(route) and end_location is not None
+        is_end = idx == num_pts and end_location is not None
         bg_color = "#e63946" if is_end else "#1A73E8"
-        label_html = f"<span style='margin-left: 6px; background: white; color: #333; font-weight: bold; font-size: 11px; padding: 2px 6px; border-radius: 4px; border: 1px solid #ccc;'>{pt['name']}</span>" if show_labels else ""
         
+        # Kiểm tra khoảng cách đến điểm kế tiếp để tính offset
+        is_close_to_next = False
+        if idx < num_pts:
+            next_pt = route[idx]
+            dist_deg = math.hypot(pt["lat"] - next_pt["lat"], pt["lon"] - next_pt["lon"])
+            if dist_deg < 0.003:  # Khoảng cách gần nhau
+                is_close_to_next = True
+
+        # Đảo vị trí nhãn dựa trên chỉ số thứ tự lẻ/chẵn nếu 2 điểm quá gần nhau
+        if is_close_to_next:
+            if idx % 2 != 0:
+                # Đặt nhãn phía trên
+                flex_dir = "column-reverse"
+                margin_style = "margin-bottom: 6px;"
+            else:
+                # Đặt nhãn phía dưới
+                flex_dir = "column"
+                margin_style = "margin-top: 6px;"
+        else:
+            flex_dir = "row"
+            margin_style = "margin-left: 6px;"
+
+        label_html = ""
+        if show_labels:
+            label_html = f"""
+            <span style="{margin_style} background: rgba(255, 255, 255, 0.95); color: #1f2937; font-weight: 700; 
+            font-size: 11px; padding: 2px 6px; border-radius: 4px; border: 1px solid #d1d5db; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15); pointer-events: none; white-space: nowrap;">
+                {pt['name']}
+            </span>
+            """
+
         marker_html = f"""
-        <div style="display: flex; align-items: center; white-space: nowrap;">
-            <div style="font-size: 10pt; font-weight: bold; color: white; background-color: {bg_color}; border: 2px solid white; border-radius: 50%; width: 28px; height: 28px; text-align: center; line-height: 24px;">{idx}</div>
+        <div style="display: flex; flex-direction: {flex_dir}; align-items: center; justify-content: center; width: auto; height: auto;">
+            <div style="font-size: 10pt; font-weight: bold; color: white; background-color: {bg_color}; 
+            border: 2px solid #ffffff; border-radius: 50%; width: 26px; height: 26px; text-align: center; 
+            line-height: 22px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); flex-shrink: 0;">
+                {idx}
+            </div>
             {label_html}
         </div>
         """
-        folium.Marker([pt["lat"], pt["lon"]], popup=f"{idx}. {pt['name']}", icon=folium.DivIcon(html=marker_html)).add_to(m)
+        
+        folium.Marker(
+            [pt["lat"], pt["lon"]], 
+            popup=f"{idx}. {pt['name']}", 
+            icon=folium.DivIcon(
+                html=marker_html,
+                icon_size=(150, 40),
+                icon_anchor=(13, 13)
+            )
+        ).add_to(m)
 
-    # Vẽ đường uốn lượn khớp hoàn toàn lòng đường
     if show_route_line:
         for line in road_lines:
             folium.PolyLine(line, color="#1A73E8", weight=6, opacity=0.85).add_to(m)
