@@ -1,5 +1,6 @@
 import json
 import os
+import math
 import requests
 import pandas as pd
 import streamlit as st
@@ -8,7 +9,9 @@ import folium
 from folium.plugins import LocateControl
 from streamlit_folium import st_folium
 
-# Cấu hình trang
+# -------------------------------------------------------------
+# CẤU HÌNH TRANG STREAMLIT
+# -------------------------------------------------------------
 st.set_page_config(
     page_title="Tối ưu đường di chuyển xe máy - Exact Target Snap",
     layout="wide",
@@ -16,7 +19,7 @@ st.set_page_config(
 )
 
 # -------------------------------------------------------------
-# 1. LOGO & CSS
+# 1. LOGO & CSS HIỆU ỨNG
 # -------------------------------------------------------------
 logo_path = "FPT_Telecom_logo.png"
 if os.path.exists(logo_path):
@@ -26,19 +29,52 @@ st.markdown(
     """
     <style>
     html, body, [data-testid="stAppViewContainer"], .main, .block-container {
-        padding: 0 !important; margin: 0 !important; height: 100vh !important; overflow: hidden !important;
+        padding: 0 !important; 
+        margin: 0 !important; 
+        height: 100vh !important; 
+        overflow: hidden !important;
     }
     [data-testid="stVerticalBlock"] { gap: 0rem !important; }
-    header[data-testid="stHeader"] { height: 0px !important; background: transparent !important; z-index: 99999 !important; }
-    @keyframes neonBlinkGlow {
-        0% { background-color: #00ffcc !important; box-shadow: 0 0 10px #00ffcc; border: 2px solid #00ffcc; transform: scale(1); }
-        50% { background-color: #00b386 !important; box-shadow: 0 0 25px #00ffcc, 0 0 45px #00ffcc; border: 2px solid #ffffff; transform: scale(1.15); }
-        100% { background-color: #00ffcc !important; box-shadow: 0 0 10px #00ffcc; border: 2px solid #00ffcc; transform: scale(1); }
+    header[data-testid="stHeader"] { 
+        height: 0px !important; 
+        background: transparent !important; 
+        z-index: 99999 !important; 
     }
-    [data-testid="collapsedControl"], [data-testid="stSidebarCollapsedControl"], button[aria-label="Open sidebar"], button[aria-label="Close sidebar"] {
-        position: fixed !important; top: 14px !important; left: 14px !important; z-index: 99999999 !important;
-        background-color: #00ffcc !important; border-radius: 50% !important; width: 44px !important; height: 44px !important;
-        display: flex !important; align-items: center !important; justify-content: center !important;
+    @keyframes neonBlinkGlow {
+        0% { 
+            background-color: #00ffcc !important; 
+            box-shadow: 0 0 10px #00ffcc; 
+            border: 2px solid #00ffcc; 
+            transform: scale(1); 
+        }
+        50% { 
+            background-color: #00b386 !important; 
+            box-shadow: 0 0 25px #00ffcc, 0 0 45px #00ffcc; 
+            border: 2px solid #ffffff; 
+            transform: scale(1.15); 
+        }
+        100% { 
+            background-color: #00ffcc !important; 
+            box-shadow: 0 0 10px #00ffcc; 
+            border: 2px solid #00ffcc; 
+            transform: scale(1); 
+        }
+    }
+    [data-testid="collapsedControl"], 
+    [data-testid="stSidebarCollapsedControl"], 
+    button[aria-label="Open sidebar"], 
+    button[aria-label="Close sidebar"] {
+        position: fixed !important; 
+        top: 14px !important; 
+        left: 14px !important; 
+        z-index: 99999999 !important;
+        background-color: #00ffcc !important; 
+        border-radius: 50% !important; 
+        width: 44px !important; 
+        height: 44px !important;
+        display: flex !important; 
+        align-items: center !important; 
+        justify-content: center !important;
         animation: neonBlinkGlow 1.2s infinite ease-in-out !important;
     }
     </style>
@@ -59,7 +95,7 @@ if (navigator.geolocation) {
                 value: {lat: pos.coords.latitude, lon: pos.coords.longitude}
             }, "*");
         },
-        (err) => console.error(err),
+        (err) => console.error("Lỗi GPS:", err),
         { enableHighAccuracy: true }
     );
 }
@@ -76,7 +112,7 @@ curr_lat = st.session_state.user_gps["lat"]
 curr_lon = st.session_state.user_gps["lon"]
 
 # -------------------------------------------------------------
-# 3. LOAD DATA (OPTIMIZED)
+# 3. LOAD DATA GEOJSON (OPTIMIZED)
 # -------------------------------------------------------------
 @st.cache_data(show_spinner=False)
 def load_geojson(file_path):
@@ -99,7 +135,7 @@ all_points = load_geojson("data.geojson")
 unique_keys = sorted(list(all_points.keys()))
 
 # -------------------------------------------------------------
-# 4. SIDEBAR & INPUTS
+# 4. SIDEBAR & ĐỊA ĐIỂM
 # -------------------------------------------------------------
 st.sidebar.header("Make by BangNC13")
 search_query = st.sidebar.text_input("Nhập điểm cuối hành trình (nếu muốn)", placeholder="Chợ Tam Cờ...")
@@ -116,8 +152,10 @@ if search_query:
                 "lon": float(res[0]["lon"])
             }
             st.sidebar.success(f"📍 Đã chọn đích: {search_query}")
-    except Exception:
-        pass
+        else:
+            st.sidebar.error("Không tìm thấy địa điểm này ở Tuyên Quang!")
+    except Exception as e:
+        st.sidebar.error(f"Lỗi tìm kiếm: {e}")
 
 st.sidebar.header("📋 Chọn lộ trình di chuyển")
 selected_from_list = st.sidebar.multiselect("Chọn điểm TQGP0xx:", options=unique_keys)
@@ -132,12 +170,12 @@ if uploaded_file:
         excel_points.extend(matched)
         st.sidebar.info(f"Tìm thấy {len(set(excel_points))} điểm từ Excel.")
     except Exception as e:
-        st.sidebar.error(f"Lỗi đọc file: {e}")
+        st.sidebar.error(f"Lỗi đọc file Excel: {e}")
 
 final_selected_names = list(set(selected_from_list + excel_points))
 
 st.sidebar.markdown("---")
-show_labels = st.sidebar.checkbox("🏷️ Hiện tên điểm", value=True)
+show_labels = st.sidebar.checkbox("🏷️ Hiện tên điểm (Label)", value=True)
 show_route_line = st.sidebar.checkbox("🛣️ Hiện đường vẽ lộ trình", value=True)
 
 if st.sidebar.button("🔄 Làm mới bản đồ"):
@@ -145,10 +183,10 @@ if st.sidebar.button("🔄 Làm mới bản đồ"):
     st.rerun()
 
 # -------------------------------------------------------------
-# 5. THUẬT TOÁN TỐI ƯU HÓA LỘ TRÌNH (OSRM MATRIX + 2-OPT)
+# 5. THUẬT TOÁN TỐI ƯU LỘ TRÌNH KIỂU GOOGLE MAPS
 # -------------------------------------------------------------
 def get_distance_matrix(coords):
-    """Lấy ma trận khoảng cách đường bộ bằng 1 request duy nhất."""
+    """Lấy ma trận khoảng cách OSRM toàn bộ danh sách điểm."""
     loc_str = ";".join([f"{lon},{lat}" for lat, lon in coords])
     url = f"http://router.project-osrm.org/table/v1/driving/{loc_str}?annotations=distance"
     try:
@@ -159,68 +197,75 @@ def get_distance_matrix(coords):
         pass
     return None
 
-def two_opt(route, dist_matrix):
-    """Thuật toán 2-Opt gỡ nút thắt, tối ưu chiều dài tuyến đường."""
-    best = route
-    improved = True
-    while improved:
-        improved = False
-        for i in range(1, len(best) - 2):
-            for j in range(i + 1, len(best) - (0 if route[-1] != route[0] else 1)):
-                if j - i == 1: continue
-                # Tính khoảng cách cũ vs mới
-                old_dist = dist_matrix[best[i-1]][best[i]] + dist_matrix[best[j]][best[j+1 if j+1 < len(best) else 0]]
-                new_dist = dist_matrix[best[i-1]][best[j]] + dist_matrix[best[i]][best[j+1 if j+1 < len(best) else 0]]
-                if new_dist < old_dist:
-                    best[i:j+1] = reversed(best[i:j+1])
-                    improved = True
-    return best
-
-def solve_tsp_advanced(start_coord, points, end_coord=None):
+def solve_tsp_google_style(start_coord, points, end_coord=None):
+    """
+    Sử dụng Ma trận khoảng cách OSRM + Thuật toán 2-Opt toàn cục
+    để loại bỏ hoàn toàn hiện tượng đi chéo/vòng ngược lộ trình.
+    """
     all_coords = [start_coord] + [(p["lat"], p["lon"]) for p in points]
     if end_coord:
         all_coords.append((end_coord["lat"], end_coord["lon"]))
 
-    dist_matrix = get_distance_matrix(all_coords)
     n = len(all_coords)
-    
-    if not dist_matrix: # Fallback sang Greedy nếu mất mạng
-        unvisited = list(range(1, len(points) + 1))
-        curr = 0
-        path = [0]
-        while unvisited:
-            nxt = min(unvisited, key=lambda x: ((all_coords[curr][0]-all_coords[x][0])**2 + (all_coords[curr][1]-all_coords[x][1])**2))
-            path.append(nxt)
-            unvisited.remove(nxt)
-            curr = nxt
-        if end_coord: path.append(n - 1)
-    else:
-        # 1. Greedy khởi tạo
-        unvisited = list(range(1, len(points) + 1))
-        curr = 0
-        path = [0]
-        while unvisited:
-            nxt = min(unvisited, key=lambda x: dist_matrix[curr][x])
-            path.append(nxt)
-            unvisited.remove(nxt)
-            curr = nxt
-        if end_coord: path.append(n - 1)
-        
-        # 2. Áp dụng 2-Opt tối ưu
-        if len(path) > 3:
-            path = two_opt(path, dist_matrix)
+    dist_matrix = get_distance_matrix(all_coords)
 
+    # Nếu mất kết nối mạng, tính khoảng cách Euclide dự phòng
+    if not dist_matrix:
+        dist_matrix = [[0]*n for _ in range(n)]
+        for i in range(n):
+            for j in range(n):
+                dist_matrix[i][j] = math.hypot(all_coords[i][0] - all_coords[j][0], all_coords[i][1] - all_coords[j][1])
+
+    # 1. Khởi tạo tuyến đường tham ăn ban đầu
+    unvisited = set(range(1, len(points) + 1))
+    curr = 0
+    path = [0]
+    while unvisited:
+        nxt = min(unvisited, key=lambda x: dist_matrix[curr][x])
+        path.append(nxt)
+        unvisited.remove(nxt)
+        curr = nxt
+
+    if end_coord:
+        path.append(n - 1)
+
+    # 2. Áp dụng 2-Opt (Local Search) tháo nút thắt lộ trình
+    def get_total_distance(p_route):
+        return sum(dist_matrix[p_route[k]][p_route[k+1]] for k in range(len(p_route) - 1))
+
+    improved = True
+    best_path = path
+    best_dist = get_total_distance(best_path)
+
+    while improved:
+        improved = False
+        for i in range(1, len(best_path) - 2):
+            for j in range(i + 1, len(best_path) - (0 if end_coord else 1)):
+                if j - i == 1:
+                    continue
+                new_path = best_path[:i] + best_path[i:j+1][::-1] + best_path[j+1:]
+                new_dist = get_total_distance(new_path)
+
+                if new_dist < best_dist:
+                    best_dist = new_dist
+                    best_path = new_path
+                    improved = True
+                    break
+            if improved:
+                break
+
+    # 3. Trả về thứ tự đã chuẩn hóa
     ordered_points = []
-    for idx in path[1:]:
+    for idx in best_path[1:]:
         if end_coord and idx == n - 1:
             ordered_points.append(end_coord)
         else:
             ordered_points.append(points[idx - 1])
-            
+
     return ordered_points
 
 def get_route_geometry(coords_list):
-    """Lấy geometry tổng lộ trình để giảm thời gian render."""
+    """Lấy tọa độ Polyline từ OSRM để vẽ đường lên bản đồ."""
     road_lines, target_connectors = [], []
     total_dist = 0.0
     
@@ -244,7 +289,7 @@ def get_route_geometry(coords_list):
     return road_lines, target_connectors, total_dist
 
 # -------------------------------------------------------------
-# 6. THỰC THI TÍNH TOÁN & HIỂN THỊ
+# 6. TÍNH TOÁN & DỰNG BẢN ĐỒ
 # -------------------------------------------------------------
 if "calculated_route" not in st.session_state:
     st.session_state.calculated_route = None
@@ -253,15 +298,20 @@ if st.sidebar.button("🚀 Lộ trình"):
     if not final_selected_names and not end_location:
         st.sidebar.warning("Vui lòng chọn điểm TQGP0xx hoặc nhập Điểm Kết Thúc!")
     else:
-        with st.spinner("Đang tính toán tuyến đường tối ưu nhất..."):
+        with st.spinner("Đang tối ưu lộ trình toàn cục..."):
             gps_start = (curr_lat, curr_lon)
             pts = [{"name": name, "lat": all_points[name]["lat"], "lon": all_points[name]["lon"]} for name in final_selected_names]
             
-            st.session_state.calculated_route = solve_tsp_advanced(gps_start, pts, end_location)
+            st.session_state.calculated_route = solve_tsp_google_style(gps_start, pts, end_location)
             st.session_state.start_coords = gps_start
 
 def build_map(center):
-    m = folium.Map(location=center, zoom_start=14, tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}", attr="Google Maps")
+    m = folium.Map(
+        location=center, 
+        zoom_start=14, 
+        tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}", 
+        attr="Google Maps"
+    )
     LocateControl(auto_start=False, flyTo=True, strings={"title": "Vị trí của tôi"}).add_to(m)
     return m
 
