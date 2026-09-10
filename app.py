@@ -242,7 +242,7 @@ if search_query:
 
 
 # -------------------------------------------------------------
-# 6. DANH SÁCH ĐIỂM CẦN GHÉ QUA & CÀI ĐẶT HIỂN THỊ
+# 6. DANH SÁCH ĐIỂM CẦN GHÉ QUA (TQGP0xx) & CẤU HÌNH HIỂN THỊ
 # -------------------------------------------------------------
 st.sidebar.header("📋 Chọn lộ trình di chuyển")
 selected_from_list = st.sidebar.multiselect(
@@ -252,15 +252,6 @@ selected_from_list = st.sidebar.multiselect(
 uploaded_file = st.sidebar.file_uploader(
     "Hoặc Upload file Excel:", type=["xlsx", "xls"]
 )
-
-# Thêm nút ON/OFF hiển thị tên tập điểm thay vì số thứ tự
-st.sidebar.markdown("---")
-show_point_names = st.sidebar.toggle(
-    "🏷️ Hiển thị tên tập điểm trên Map", 
-    value=False,
-    help="Bật để hiển thị tên thay vì số thứ tự bước đi (1, 2, 3...)"
-)
-
 excel_points = []
 
 if uploaded_file:
@@ -292,6 +283,9 @@ if uploaded_file:
         st.sidebar.error(f"Lỗi đọc file Excel: {e}")
 
 final_selected_names = list(set(selected_from_list + excel_points))
+
+# Nút công tắc ẩn/hiện tên tập điểm trên Map
+show_labels = st.sidebar.toggle("🏷️ Hiển thị tên điểm trên bản đồ", value=True)
 
 
 # -------------------------------------------------------------
@@ -369,7 +363,7 @@ if st.sidebar.button("🚀 Lộ trình "):
 
 
 # -------------------------------------------------------------
-# 9. HIỂN THỊ BẢN ĐỒ VIEW MAP (CÓ INJECT JS/CSS ÉP PARENT DONG NÚT)
+# 9. HIỂN THỊ BẢN ĐỒ VIEW MAP
 # -------------------------------------------------------------
 def build_map(location, zoom=14):
     m = folium.Map(
@@ -410,20 +404,19 @@ def build_map(location, zoom=14):
         content: "" !important;
         width: 22px !important;
         height: 22px !important;
-        background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="black"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7 z"/></svg>') !important;
+        background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="black"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>') !important;
         background-repeat: no-repeat !important;
         background-position: center !important;
         background-size: contain !important;
     }
     </style>
     <script>
-    // JS Injection liên tục quét và add class nhấp nháy vào nút '>>' ngoài Streamlit
     setInterval(function() {
         try {
             var parentDoc = window.parent.document;
             var openBtn = parentDoc.querySelector('[data-testid="collapsedControl"]') || 
-                        parentDoc.querySelector('[data-testid="stSidebarCollapsedControl"]') ||
-                        parentDoc.querySelector('button[aria-label="Open sidebar"]');
+                          parentDoc.querySelector('[data-testid="stSidebarCollapsedControl"]') ||
+                          parentDoc.querySelector('button[aria-label="Open sidebar"]');
             if (openBtn) {
                 openBtn.style.setProperty('animation', 'neonBlinkGlow 1.2s infinite ease-in-out', 'important');
                 openBtn.style.setProperty('background-color', '#00ffcc', 'important');
@@ -466,19 +459,24 @@ if st.session_state.calculated_route is not None:
         is_end = idx == len(optimized_route) and end_location is not None
         bg_color = "#e63946" if is_end else "#0078ff"
 
-        # Hiển thị linh hoạt dựa vào nút Toggle ở Sidebar
-        if show_point_names:
-            marker_html = f'<div style="font-size: 9pt; font-weight: bold; color: white; background-color: {bg_color}; border: 2px solid white; padding: 3px 6px; border-radius: 4px; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">{idx}. {point["name"]}</div>'
-            icon_config = folium.DivIcon(html=marker_html, class_name="leaflet-data-marker", icon_size=None)
+        # Kiểm tra biến show_labels để quyết định hiển thị nhãn tên hay chỉ hiển thị bóng tròn số
+        if show_labels:
+            marker_html = f"""
+            <div style="display: flex; align-items: center; white-space: nowrap;">
+                <div style="font-size: 10pt; font-weight: bold; color: white; background-color: {bg_color}; border: 2px solid white; border-radius: 50%; width: 28px; height: 28px; text-align: center; line-height: 24px; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">{idx}</div>
+                <span style="margin-left: 6px; background-color: white; color: #333; font-weight: bold; font-size: 11px; padding: 2px 6px; border-radius: 4px; border: 1px solid #ccc; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">{point['name']}</span>
+            </div>
+            """
         else:
-            marker_html = f'<div style="font-size: 10pt; font-weight: bold; color: white; background-color: {bg_color}; border: 2px solid white; border-radius: 50%; width: 28px; height: 28px; text-align: center; line-height: 24px;">{idx}</div>'
-            icon_config = folium.DivIcon(html=marker_html)
+            marker_html = f"""
+            <div style="font-size: 10pt; font-weight: bold; color: white; background-color: {bg_color}; border: 2px solid white; border-radius: 50%; width: 28px; height: 28px; text-align: center; line-height: 24px; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">{idx}</div>
+            """
 
         folium.Marker(
             [p_lat, p_lon],
             popup=f"Bước {idx}: {point['name']}",
             tooltip=f"{idx}. {point['name']}",
-            icon=icon_config,
+            icon=folium.DivIcon(html=marker_html),
         ).add_to(m)
 
     folium.PolyLine(
