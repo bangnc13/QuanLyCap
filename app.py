@@ -41,40 +41,17 @@ st.markdown(
         z-index: 99999 !important; 
     }
     @keyframes neonBlinkGlow {
-        0% { 
-            background-color: #00ffcc !important; 
-            box-shadow: 0 0 10px #00ffcc; 
-            border: 2px solid #00ffcc; 
-            transform: scale(1); 
-        }
-        50% { 
-            background-color: #00b386 !important; 
-            box-shadow: 0 0 25px #00ffcc, 0 0 45px #00ffcc; 
-            border: 2px solid #ffffff; 
-            transform: scale(1.15); 
-        }
-        100% { 
-            background-color: #00ffcc !important; 
-            box-shadow: 0 0 10px #00ffcc; 
-            border: 2px solid #00ffcc; 
-            transform: scale(1); 
-        }
+        0% { background-color: #00ffcc !important; box-shadow: 0 0 10px #00ffcc; border: 2px solid #00ffcc; transform: scale(1); }
+        50% { background-color: #00b386 !important; box-shadow: 0 0 25px #00ffcc, 0 0 45px #00ffcc; border: 2px solid #ffffff; transform: scale(1.15); }
+        100% { background-color: #00ffcc !important; box-shadow: 0 0 10px #00ffcc; border: 2px solid #00ffcc; transform: scale(1); }
     }
     [data-testid="collapsedControl"], 
     [data-testid="stSidebarCollapsedControl"], 
     button[aria-label="Open sidebar"], 
     button[aria-label="Close sidebar"] {
-        position: fixed !important; 
-        top: 14px !important; 
-        left: 14px !important; 
-        z-index: 99999999 !important;
-        background-color: #00ffcc !important; 
-        border-radius: 50% !important; 
-        width: 44px !important; 
-        height: 44px !important;
-        display: flex !important; 
-        align-items: center !important; 
-        justify-content: center !important;
+        position: fixed !important; top: 14px !important; left: 14px !important; z-index: 99999999 !important;
+        background-color: #00ffcc !important; border-radius: 50% !important; width: 44px !important; height: 44px !important;
+        display: flex !important; align-items: center !important; justify-content: center !important;
         animation: neonBlinkGlow 1.2s infinite ease-in-out !important;
     }
     </style>
@@ -83,36 +60,35 @@ st.markdown(
 )
 
 # -------------------------------------------------------------
-# 2. GPS REALTIME
+# 2. GPS REALTIME (CHỈ CHẠY 1 LẦN NẾU CHƯA CÓ)
 # -------------------------------------------------------------
-gps_code = """
-<script>
-if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-        (pos) => {
-            window.parent.postMessage({
-                type: "streamlit:setComponentValue",
-                value: {lat: pos.coords.latitude, lon: pos.coords.longitude}
-            }, "*");
-        },
-        (err) => console.error("Lỗi GPS:", err),
-        { enableHighAccuracy: true }
-    );
-}
-</script>
-"""
-gps_data = components.html(gps_code, height=0)
-
 if "user_gps" not in st.session_state:
     st.session_state.user_gps = {"lat": 21.82714, "lon": 105.19952}
-if gps_data and isinstance(gps_data, dict) and "lat" in gps_data:
-    st.session_state.user_gps = gps_data
+    gps_code = """
+    <script>
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                window.parent.postMessage({
+                    type: "streamlit:setComponentValue",
+                    value: {lat: pos.coords.latitude, lon: pos.coords.longitude}
+                }, "*");
+            },
+            (err) => console.error("Lỗi GPS:", err),
+            { enableHighAccuracy: true }
+        );
+    }
+    </script>
+    """
+    gps_data = components.html(gps_code, height=0)
+    if gps_data and isinstance(gps_data, dict) and "lat" in gps_data:
+        st.session_state.user_gps = gps_data
 
 curr_lat = st.session_state.user_gps["lat"]
 curr_lon = st.session_state.user_gps["lon"]
 
 # -------------------------------------------------------------
-# 3. LOAD DATA GEOJSON (OPTIMIZED)
+# 3. LOAD DATA GEOJSON (OPTIMIZED CACHE)
 # -------------------------------------------------------------
 @st.cache_data(show_spinner=False)
 def load_geojson(file_path):
@@ -180,17 +156,18 @@ show_route_line = st.sidebar.checkbox("🛣️ Hiện đường vẽ lộ trình
 
 if st.sidebar.button("🔄 Làm mới bản đồ"):
     st.session_state.calculated_route = None
+    st.session_state.route_cache = None
     st.rerun()
 
 # -------------------------------------------------------------
-# 5. THUẬT TOÁN TỐI ƯU LỘ TRÌNH KIỂU GOOGLE MAPS
+# 5. THUẬT TOÁN TỐI ƯU & LOAD TỌA ĐỘ SIÊU TỐC
 # -------------------------------------------------------------
 def get_distance_matrix(coords):
-    """Lấy ma trận khoảng cách OSRM toàn bộ danh sách điểm."""
+    """Lấy Ma trận khoảng cách qua 1 Request OSRM."""
     loc_str = ";".join([f"{lon},{lat}" for lat, lon in coords])
     url = f"http://router.project-osrm.org/table/v1/driving/{loc_str}?annotations=distance"
     try:
-        res = requests.get(url, timeout=5).json()
+        res = requests.get(url, timeout=4).json()
         if res.get("code") == "Ok":
             return res["distances"]
     except Exception:
@@ -198,10 +175,7 @@ def get_distance_matrix(coords):
     return None
 
 def solve_tsp_google_style(start_coord, points, end_coord=None):
-    """
-    Sử dụng Ma trận khoảng cách OSRM + Thuật toán 2-Opt toàn cục
-    để loại bỏ hoàn toàn hiện tượng đi chéo/vòng ngược lộ trình.
-    """
+    """Chạy 2-Opt tối ưu thứ tự lộ trình."""
     all_coords = [start_coord] + [(p["lat"], p["lon"]) for p in points]
     if end_coord:
         all_coords.append((end_coord["lat"], end_coord["lon"]))
@@ -209,14 +183,12 @@ def solve_tsp_google_style(start_coord, points, end_coord=None):
     n = len(all_coords)
     dist_matrix = get_distance_matrix(all_coords)
 
-    # Nếu mất kết nối mạng, tính khoảng cách Euclide dự phòng
     if not dist_matrix:
         dist_matrix = [[0]*n for _ in range(n)]
         for i in range(n):
             for j in range(n):
                 dist_matrix[i][j] = math.hypot(all_coords[i][0] - all_coords[j][0], all_coords[i][1] - all_coords[j][1])
 
-    # 1. Khởi tạo tuyến đường tham ăn ban đầu
     unvisited = set(range(1, len(points) + 1))
     curr = 0
     path = [0]
@@ -229,7 +201,6 @@ def solve_tsp_google_style(start_coord, points, end_coord=None):
     if end_coord:
         path.append(n - 1)
 
-    # 2. Áp dụng 2-Opt (Local Search) tháo nút thắt lộ trình
     def get_total_distance(p_route):
         return sum(dist_matrix[p_route[k]][p_route[k+1]] for k in range(len(p_route) - 1))
 
@@ -245,7 +216,6 @@ def solve_tsp_google_style(start_coord, points, end_coord=None):
                     continue
                 new_path = best_path[:i] + best_path[i:j+1][::-1] + best_path[j+1:]
                 new_dist = get_total_distance(new_path)
-
                 if new_dist < best_dist:
                     best_dist = new_dist
                     best_path = new_path
@@ -254,7 +224,6 @@ def solve_tsp_google_style(start_coord, points, end_coord=None):
             if improved:
                 break
 
-    # 3. Trả về thứ tự đã chuẩn hóa
     ordered_points = []
     for idx in best_path[1:]:
         if end_coord and idx == n - 1:
@@ -264,46 +233,60 @@ def solve_tsp_google_style(start_coord, points, end_coord=None):
 
     return ordered_points
 
-def get_route_geometry(coords_list):
-    """Lấy tọa độ Polyline từ OSRM để vẽ đường lên bản đồ."""
-    road_lines, target_connectors = [], []
-    total_dist = 0.0
+def get_single_batch_route(coords_list):
+    """
+    TỐI ƯU SIÊU TỐC:
+    Gộp toàn bộ các điểm cần đi vào BATCH ROUTE API duy nhất của OSRM.
+    Chỉ thực hiện 1 HTTP Request thay vì N HTTP Requests.
+    """
+    loc_str = ";".join([f"{lon},{lat}" for lat, lon in coords_list])
+    url = f"http://router.project-osrm.org/route/v1/driving/{loc_str}?overview=simplified&geometries=geojson"
     
-    for i in range(len(coords_list) - 1):
-        p1, p2 = coords_list[i], coords_list[i+1]
-        url = f"http://router.project-osrm.org/route/v1/driving/{p1[1]},{p1[0]};{p2[1]},{p2[0]}?overview=simplified&geometries=geojson"
-        try:
-            res = requests.get(url, timeout=3).json()
-            if res.get("code") == "Ok":
-                route_data = res["routes"][0]
-                geom = [[lat, lon] for lon, lat in route_data["geometry"]["coordinates"]]
-                total_dist += route_data["distance"] / 1000.0
-                road_lines.append(geom)
-                target_connectors.append([[p1[0], p1[1]], geom[0]])
-                target_connectors.append([geom[-1], [p2[0], p2[1]]])
-                continue
-        except Exception:
-            pass
-        road_lines.append([[p1[0], p1[1]], [p2[0], p2[1]]])
-        
-    return road_lines, target_connectors, total_dist
+    try:
+        res = requests.get(url, timeout=5).json()
+        if res.get("code") == "Ok":
+            route_data = res["routes"][0]
+            geom = [[lat, lon] for lon, lat in route_data["geometry"]["coordinates"]]
+            total_dist = route_data["distance"] / 1000.0
+            return [geom], total_dist
+    except Exception:
+        pass
+
+    # Dự phòng nếu mạng yếu
+    road_line = [[lat, lon] for lat, lon in coords_list]
+    return [road_line], 0.0
 
 # -------------------------------------------------------------
 # 6. TÍNH TOÁN & DỰNG BẢN ĐỒ
 # -------------------------------------------------------------
 if "calculated_route" not in st.session_state:
     st.session_state.calculated_route = None
+if "route_cache" not in st.session_state:
+    st.session_state.route_cache = None
 
 if st.sidebar.button("🚀 Lộ trình"):
     if not final_selected_names and not end_location:
         st.sidebar.warning("Vui lòng chọn điểm TQGP0xx hoặc nhập Điểm Kết Thúc!")
     else:
-        with st.spinner("Đang tối ưu lộ trình toàn cục..."):
+        with st.spinner("Tối ưu & Tải lộ trình siêu tốc..."):
             gps_start = (curr_lat, curr_lon)
             pts = [{"name": name, "lat": all_points[name]["lat"], "lon": all_points[name]["lon"]} for name in final_selected_names]
             
-            st.session_state.calculated_route = solve_tsp_google_style(gps_start, pts, end_location)
+            # Tính lộ trình
+            opt_route = solve_tsp_google_style(gps_start, pts, end_location)
+            stop_coords = [gps_start] + [(p["lat"], p["lon"]) for p in opt_route]
+            
+            # Tải đường vẽ dạng Batch 1 lần
+            road_lines, real_dist = get_single_batch_route(stop_coords)
+            
+            # Cất vào Session State
+            st.session_state.calculated_route = opt_route
             st.session_state.start_coords = gps_start
+            st.session_state.route_cache = {
+                "road_lines": road_lines,
+                "real_dist": real_dist,
+                "stop_coords": stop_coords
+            }
 
 def build_map(center):
     m = folium.Map(
@@ -315,12 +298,15 @@ def build_map(center):
     LocateControl(auto_start=False, flyTo=True, strings={"title": "Vị trí của tôi"}).add_to(m)
     return m
 
-if st.session_state.calculated_route:
+if st.session_state.calculated_route and st.session_state.route_cache:
     route = st.session_state.calculated_route
     s_lat, s_lon = st.session_state.start_coords
-    stop_coords = [(s_lat, s_lon)] + [(p["lat"], p["lon"]) for p in route]
+    
+    cache = st.session_state.route_cache
+    road_lines = cache["road_lines"]
+    real_dist = cache["real_dist"]
+    stop_coords = cache["stop_coords"]
 
-    road_lines, connectors, real_dist = get_route_geometry(stop_coords)
     st.sidebar.success(f"📊 Tổng quãng đường: **~ {real_dist:.2f} km**")
 
     m = build_map([s_lat, s_lon])
@@ -341,9 +327,7 @@ if st.session_state.calculated_route:
 
     if show_route_line:
         for line in road_lines:
-            folium.PolyLine(line, color="#1A73E8", weight=6, opacity=0.85).add_to(m)
-        for conn in connectors:
-            folium.PolyLine(conn, color="#1A73E8", weight=4, opacity=0.9).add_to(m)
+            folium.PolyLine(line, color="#1A73E8", weight=5, opacity=0.8).add_to(m)
 
     m.fit_bounds(stop_coords)
     st_folium(m, use_container_width=True, height=1000, key="optimized_map")
