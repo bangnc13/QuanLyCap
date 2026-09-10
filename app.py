@@ -14,7 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 # CẤU HÌNH TRANG STREAMLIT
 # -------------------------------------------------------------
 st.set_page_config(
-    page_title="Tối ưu đường di chuyển xe máy - Exact Target Snap",
+    page_title="Tối ưu đường di chuyển xe máy - Tuyên Quang",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -161,11 +161,19 @@ if st.sidebar.button("🔄 Làm mới bản đồ"):
     st.rerun()
 
 # -------------------------------------------------------------
-# 5. THUẬT TOÁN TỐI ƯU VÀ KHỚP ĐƯỜNG BỘ CHÍNH XÁC
+# 5. THUẬT TOÁN TỐI ƯU VÀ KHẮC PHỤC LỖI NÉ ĐƯỜNG QUANG TRUNG
 # -------------------------------------------------------------
+def haversine_distance(lat1, lon1, lat2, lon2):
+    R = 6371.0 # Bán kính Trái Đất (km)
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat / 2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c
+
 def get_distance_matrix(coords):
     loc_str = ";".join([f"{lon},{lat}" for lat, lon in coords])
-    radiuses = ";".join(["200"] * len(coords))
+    radiuses = ";".join(["300"] * len(coords))
     url = f"http://router.project-osrm.org/table/v1/driving/{loc_str}?annotations=distance&radiuses={radiuses}"
     try:
         res = requests.get(url, timeout=4).json()
@@ -187,7 +195,7 @@ def solve_tsp_google_style(start_coord, points, end_coord=None):
         dist_matrix = [[0]*n for _ in range(n)]
         for i in range(n):
             for j in range(n):
-                dist_matrix[i][j] = math.hypot(all_coords[i][0] - all_coords[j][0], all_coords[i][1] - all_coords[j][1])
+                dist_matrix[i][j] = haversine_distance(all_coords[i][0], all_coords[i][1], all_coords[j][0], all_coords[j][1])
 
     unvisited = set(range(1, len(points) + 1))
     curr = 0
@@ -234,18 +242,36 @@ def solve_tsp_google_style(start_coord, points, end_coord=None):
     return ordered_points
 
 def fetch_osrm_segment_exact(pair):
+    """
+    Xử lý lỗi OSRM đi đường vòng:
+    Tự động so sánh khoảng cách OSRM trả về với khoảng cách thực tế (Haversine).
+    Nếu OSRM bắt đi vòng lèo (>1.35 lần độ dài thực tế), hệ thống ép nối đường thẳng trực tiếp.
+    """
     p1, p2 = pair
-    url = f"http://router.project-osrm.org/route/v1/driving/{p1[1]},{p1[0]};{p2[1]},{p2[0]}?overview=full&geometries=geojson&radiuses=500;500&continue_straight=false"
+    direct_dist = haversine_distance(p1[0], p1[1], p2[0], p2[1])
+    
+    url = (
+        f"http://router.project-osrm.org/route/v1/driving/"
+        f"{p1[1]},{p1[0]};{p2[1]},{p2[0]}"
+        f"?overview=full&geometries=geojson&radiuses=500;500&continue_straight=true"
+    )
+    
     try:
         res = requests.get(url, timeout=4).json()
         if res.get("code") == "Ok":
             route_data = res["routes"][0]
+            osrm_dist = route_data["distance"] / 1000.0
             geom = [[lat, lon] for lon, lat in route_data["geometry"]["coordinates"]]
-            dist = route_data["distance"] / 1000.0
-            return geom, dist
+            
+            # KIỂM TRA LỖI VÒNG: Nếu OSRM vẽ tuyến dài hơn 1.35 lần đường thẳng, bỏ lộ trình uốn cong
+            if osrm_dist > direct_dist * 1.35 and direct_dist > 0.5:
+                return [[p1[0], p1[1]], [p2[0], p2[1]]], direct_dist
+                
+            return geom, osrm_dist
     except Exception:
         pass
-    return [[p1[0], p1[1]], [p2[0], p2[1]]], 0.0
+        
+    return [[p1[0], p1[1]], [p2[0], p2[1]]], direct_dist
 
 def get_accurate_route_geometry_parallel(coords_list):
     pairs = [(coords_list[i], coords_list[i+1]) for i in range(len(coords_list)-1)]
@@ -262,7 +288,7 @@ def get_accurate_route_geometry_parallel(coords_list):
     return road_lines, total_dist
 
 # -------------------------------------------------------------
-# 6. TÍNH TOÁN & DỰNG BẢN ĐỒ VỚI THUẬT TOÁN ĐẢO HƯỚNG NHÃN
+# 6. TÍNH TOÁN & DỰNG BẢN ĐỒ
 # -------------------------------------------------------------
 if "calculated_route" not in st.session_state:
     st.session_state.calculated_route = None
@@ -273,7 +299,7 @@ if st.sidebar.button("🚀 Lộ trình"):
     if not final_selected_names and not end_location:
         st.sidebar.warning("Vui lòng chọn điểm TQGP0xx hoặc nhập Điểm Kết Thúc!")
     else:
-        with st.spinner("Đang xử lý vị trí điểm & chống chồng nhãn..."):
+        with st.spinner("Đang tối ưu lộ trình và kiểm tra đường thẳng..."):
             gps_start = (curr_lat, curr_lon)
             pts = [{"name": name, "lat": all_points[name]["lat"], "lon": all_points[name]["lon"]} for name in final_selected_names]
             
@@ -293,7 +319,7 @@ if st.sidebar.button("🚀 Lộ trình"):
 def build_map(center):
     m = folium.Map(
         location=center, 
-        zoom_start=16, 
+        zoom_start=15, 
         tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}", 
         attr="Google Maps"
     )
@@ -314,28 +340,24 @@ if st.session_state.calculated_route and st.session_state.route_cache:
     m = build_map([s_lat, s_lon])
     folium.Marker([s_lat, s_lon], popup="Xuất phát", icon=folium.Icon(color="green", icon="user", prefix="fa")).add_to(m)
 
-    # THUẬT TOÁN CHỐNG ĐÈ NHÃN (LABEL ANTI-OVERLAP)
+    # ĐIỀU CHỈNH CHỐNG CHỒNG NHÃN LABEL
     num_pts = len(route)
     for idx, pt in enumerate(route, start=1):
         is_end = idx == num_pts and end_location is not None
         bg_color = "#e63946" if is_end else "#1A73E8"
         
-        # Kiểm tra khoảng cách đến điểm kế tiếp để tính offset
         is_close_to_next = False
         if idx < num_pts:
             next_pt = route[idx]
             dist_deg = math.hypot(pt["lat"] - next_pt["lat"], pt["lon"] - next_pt["lon"])
-            if dist_deg < 0.003:  # Khoảng cách gần nhau
+            if dist_deg < 0.003:
                 is_close_to_next = True
 
-        # Đảo vị trí nhãn dựa trên chỉ số thứ tự lẻ/chẵn nếu 2 điểm quá gần nhau
         if is_close_to_next:
             if idx % 2 != 0:
-                # Đặt nhãn phía trên
                 flex_dir = "column-reverse"
                 margin_style = "margin-bottom: 6px;"
             else:
-                # Đặt nhãn phía dưới
                 flex_dir = "column"
                 margin_style = "margin-top: 6px;"
         else:
